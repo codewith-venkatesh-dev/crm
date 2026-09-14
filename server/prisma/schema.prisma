@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  LINKEDIN
+  COLD_EMAIL
+  WHATSAPP
+  PHONE_CALL
+  ADVERTISEMENT
+  OTHER
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  NEGOTIATING
+  CLOSED
+  LOST
+}
+
+enum FollowUpType {
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  TASK
+  OTHER
+}
+
+enum ActivityType {
+  NOTE
+  CALL
+  EMAIL
+  MEETING
+  WHATSAPP
+  STATUS_CHANGE
+  SYSTEM
+}
+
+model Lead {
+  id          String      @id @default(uuid())
+  name        String
+  companyName String?
+  email       String?
+  phone       String?
+  source      LeadSource
+  status      LeadStatus  @default(NEW)
+  notes       String?     @db.Text
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  followUps  FollowUp[]
+  activities Activity[]
+
+  @@index([status])
+  @@index([source])
+  @@index([name])
+  @@map("leads")
+}
+
+model FollowUp {
+  id          String       @id @default(uuid())
+  leadId      String
+  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  title       String
+  description String?      @db.Text
+  dueDate     DateTime
+  dueTime     String?
+  type        FollowUpType @default(TASK)
+  isCompleted Boolean      @default(false)
+  completedAt DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([leadId])
+  @@index([dueDate])
+  @@index([isCompleted])
+  @@map("follow_ups")
+}
+
+model Activity {
+  id        String       @id @default(uuid())
+  leadId    String
+  lead      Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  type      ActivityType @default(NOTE)
+  content   String       @db.Text
+  createdAt DateTime     @default(now())
+
+  @@index([leadId])
+  @@map("activities")
+}
