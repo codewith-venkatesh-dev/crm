@@ -1,18 +1,45 @@
 import { PrismaClient, LeadSource, LeadStatus, FollowUpType, ActivityType } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log('🌱 Starting database seeding...');
+  console.log('🌱 Starting database seeding with users & auth...');
 
   // Clean existing data
   await prisma.activity.deleteMany();
   await prisma.followUp.deleteMany();
   await prisma.lead.deleteMany();
+  await prisma.user.deleteMany();
+
+  // Create hashed default passwords
+  const passwordHash = await bcrypt.hash('password123', 10);
+
+  // 1. Create Super Admin User (userRight = 1)
+  const adminUser = await prisma.user.create({
+    data: {
+      name: 'Alex Vance (Super Admin)',
+      email: 'admin@crm.com',
+      password: passwordHash,
+      userRight: 1,
+    },
+  });
+
+  // 2. Create Normal Sales Agent User (userRight = 0)
+  const agentUser = await prisma.user.create({
+    data: {
+      name: 'Jordan Lee (Sales Representative)',
+      email: 'agent@crm.com',
+      password: passwordHash,
+      userRight: 0,
+    },
+  });
+
+  console.log(`👤 Created Users:
+  - Super Admin: admin@crm.com (Password: password123, userRight: 1)
+  - Sales Agent: agent@crm.com (Password: password123, userRight: 0)`);
 
   const now = new Date();
-  
-  // Helper dates
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
   const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
@@ -20,8 +47,8 @@ async function main() {
   const tomorrow = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const nextWeek = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  // 1. Lead: Overdue follow-up (Contacted)
-  const lead1 = await prisma.lead.create({
+  // 1. Lead: Overdue follow-up with closure outcome note
+  await prisma.lead.create({
     data: {
       name: 'Sarah Jenkins',
       companyName: 'Apex Financial Technologies',
@@ -30,6 +57,7 @@ async function main() {
       source: LeadSource.WEBSITE,
       status: LeadStatus.CONTACTED,
       notes: 'Interested in enterprise seat licensing. Demo was delivered last Thursday.',
+      createdById: adminUser.id,
       createdAt: fiveDaysAgo,
       updatedAt: yesterday,
       followUps: {
@@ -41,6 +69,8 @@ async function main() {
             dueTime: '14:00',
             type: FollowUpType.EMAIL,
             isCompleted: false,
+            createdById: adminUser.id,
+            assignedToId: agentUser.id,
           },
           {
             title: 'Initial Discovery Call',
@@ -50,33 +80,37 @@ async function main() {
             type: FollowUpType.CALL,
             isCompleted: true,
             completedAt: threeDaysAgo,
-          }
-        ]
+            completionNote: 'Completed 30-min call. Customer has 50 reps and requires custom SSO integration.',
+            createdById: adminUser.id,
+            assignedToId: agentUser.id,
+            completedById: agentUser.id,
+          },
+        ],
       },
       activities: {
         create: [
           {
             type: ActivityType.SYSTEM,
-            content: 'Lead created via Website contact form submission',
+            content: 'Lead created by Alex Vance via Website contact form submission',
             createdAt: fiveDaysAgo,
           },
           {
             type: ActivityType.CALL,
-            content: 'Had 30-minute discovery call with Sarah. She requested a custom enterprise quote.',
+            content: 'Discovery call outcome: Customer has 50 reps and requires custom SSO integration.',
             createdAt: threeDaysAgo,
           },
           {
             type: ActivityType.STATUS_CHANGE,
             content: 'Status updated from NEW to CONTACTED',
             createdAt: threeDaysAgo,
-          }
-        ]
-      }
-    }
+          },
+        ],
+      },
+    },
   });
 
   // 2. Lead: Due Today follow-up (Negotiating)
-  const lead2 = await prisma.lead.create({
+  await prisma.lead.create({
     data: {
       name: 'Michael Chen',
       companyName: 'Horizon Logistics Corp',
@@ -85,6 +119,7 @@ async function main() {
       source: LeadSource.LINKEDIN,
       status: LeadStatus.NEGOTIATING,
       notes: 'Evaluating contract terms. Security review complete.',
+      createdById: agentUser.id,
       createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
       updatedAt: now,
       followUps: {
@@ -96,14 +131,16 @@ async function main() {
             dueTime: '15:30',
             type: FollowUpType.MEETING,
             isCompleted: false,
-          }
-        ]
+            createdById: agentUser.id,
+            assignedToId: agentUser.id,
+          },
+        ],
       },
       activities: {
         create: [
           {
             type: ActivityType.SYSTEM,
-            content: 'Lead imported from LinkedIn campaign outreach',
+            content: 'Lead added by Jordan Lee from LinkedIn campaign outreach',
             createdAt: new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000),
           },
           {
@@ -115,14 +152,14 @@ async function main() {
             type: ActivityType.STATUS_CHANGE,
             content: 'Status changed from CONTACTED to NEGOTIATING',
             createdAt: twoDaysAgo,
-          }
-        ]
-      }
-    }
+          },
+        ],
+      },
+    },
   });
 
-  // 3. Lead: Closed Lead
-  const lead3 = await prisma.lead.create({
+  // 3. Lead: Closed Lead with completed follow-up outcome note
+  await prisma.lead.create({
     data: {
       name: 'Elena Rostova',
       companyName: 'Vanguard Retail Group',
@@ -131,6 +168,7 @@ async function main() {
       source: LeadSource.REFERRAL,
       status: LeadStatus.CLOSED,
       notes: 'Deal closed! Annual subscription paid. Onboarding scheduled.',
+      createdById: adminUser.id,
       createdAt: new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000),
       updatedAt: yesterday,
       followUps: {
@@ -142,6 +180,8 @@ async function main() {
             dueTime: '11:00',
             type: FollowUpType.MEETING,
             isCompleted: false,
+            createdById: adminUser.id,
+            assignedToId: adminUser.id,
           },
           {
             title: 'Receive Signed Contract',
@@ -151,8 +191,12 @@ async function main() {
             type: FollowUpType.TASK,
             isCompleted: true,
             completedAt: yesterday,
-          }
-        ]
+            completionNote: 'Master Service Agreement signed by VP Elena Rostova. Initial payment confirmed via wire.',
+            createdById: adminUser.id,
+            assignedToId: adminUser.id,
+            completedById: adminUser.id,
+          },
+        ],
       },
       activities: {
         create: [
@@ -165,14 +209,14 @@ async function main() {
             type: ActivityType.STATUS_CHANGE,
             content: 'Status updated to CLOSED. Signed contract received!',
             createdAt: yesterday,
-          }
-        ]
-      }
-    }
+          },
+        ],
+      },
+    },
   });
 
   // 4. Lead: New Lead
-  const lead4 = await prisma.lead.create({
+  await prisma.lead.create({
     data: {
       name: 'David Miller',
       companyName: 'Nexus Cloud Systems',
@@ -181,7 +225,8 @@ async function main() {
       source: LeadSource.COLD_EMAIL,
       status: LeadStatus.NEW,
       notes: 'Responded positively to cold outreach campaign. Asking for product specs.',
-      createdAt: new Date(now.getTime() - 4 * 60 * 60 * 1000), // 4 hours ago
+      createdById: agentUser.id,
+      createdAt: new Date(now.getTime() - 4 * 60 * 60 * 1000),
       updatedAt: new Date(now.getTime() - 4 * 60 * 60 * 1000),
       followUps: {
         create: [
@@ -192,8 +237,10 @@ async function main() {
             dueTime: '09:30',
             type: FollowUpType.EMAIL,
             isCompleted: false,
-          }
-        ]
+            createdById: agentUser.id,
+            assignedToId: agentUser.id,
+          },
+        ],
       },
       activities: {
         create: [
@@ -201,133 +248,13 @@ async function main() {
             type: ActivityType.EMAIL,
             content: 'Received reply from outbound cold sequence asking for API documentation.',
             createdAt: new Date(now.getTime() - 4 * 60 * 60 * 1000),
-          }
-        ]
-      }
-    }
-  });
-
-  // 5. Lead: Lost Lead
-  const lead5 = await prisma.lead.create({
-    data: {
-      name: 'Amanda Martinez',
-      companyName: 'Solaris Energy Solutions',
-      email: 'amanda.m@solarisenergy.com',
-      phone: '+1 (555) 456-7890',
-      source: LeadSource.ADVERTISEMENT,
-      status: LeadStatus.LOST,
-      notes: 'Chose a competitor due to legacy system integration constraints.',
-      createdAt: new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000),
-      updatedAt: fiveDaysAgo,
-      activities: {
-        create: [
-          {
-            type: ActivityType.STATUS_CHANGE,
-            content: 'Lead marked as LOST. Reason: Needed specialized AS400 connector.',
-            createdAt: fiveDaysAgo,
-          }
-        ]
-      }
-    }
-  });
-
-  // 6. Lead: Contacted with upcoming WhatsApp follow-up
-  const lead6 = await prisma.lead.create({
-    data: {
-      name: 'Robert Taylor',
-      companyName: 'Global Transit Logistics',
-      email: 'rtaylor@globaltransit.net',
-      phone: '+1 (555) 654-3210',
-      source: LeadSource.WHATSAPP,
-      status: LeadStatus.CONTACTED,
-      notes: 'Prefers communication over WhatsApp. Requested high-level pitch video.',
-      createdAt: twoDaysAgo,
-      updatedAt: yesterday,
-      followUps: {
-        create: [
-          {
-            title: 'Send Demo Video via WhatsApp',
-            description: 'Share loom video walk-through of team collaboration features',
-            dueDate: tomorrow,
-            dueTime: '14:00',
-            type: FollowUpType.WHATSAPP,
-            isCompleted: false,
-          }
-        ]
+          },
+        ],
       },
-      activities: {
-        create: [
-          {
-            type: ActivityType.WHATSAPP,
-            content: 'Initial contact via WhatsApp business line.',
-            createdAt: twoDaysAgo,
-          }
-        ]
-      }
-    }
+    },
   });
 
-  // 7. Lead: Negotiating
-  const lead7 = await prisma.lead.create({
-    data: {
-      name: 'Priya Sharma',
-      companyName: 'Innovate Healthcare Tech',
-      email: 'priya.sharma@innovatehealth.org',
-      phone: '+1 (555) 789-0123',
-      source: LeadSource.PHONE_CALL,
-      status: LeadStatus.NEGOTIATING,
-      notes: 'Finalizing HIPAA compliance documentation and custom data retention terms.',
-      createdAt: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
-      updatedAt: yesterday,
-      followUps: {
-        create: [
-          {
-            title: 'Security Compliance Sign-off',
-            description: 'Obtain signed BAA and security audit agreement from compliance lead',
-            dueDate: nextWeek,
-            dueTime: '16:00',
-            type: FollowUpType.TASK,
-            isCompleted: false,
-          }
-        ]
-      },
-      activities: {
-        create: [
-          {
-            type: ActivityType.CALL,
-            content: 'Inbound phone call regarding enterprise tier data residency options.',
-            createdAt: new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000),
-          }
-        ]
-      }
-    }
-  });
-
-  // 8. Lead: New
-  const lead8 = await prisma.lead.create({
-    data: {
-      name: 'James Wilson',
-      companyName: 'Apex CyberSec',
-      email: 'j.wilson@apexcyber.io',
-      phone: '+1 (555) 890-1234',
-      source: LeadSource.OTHER,
-      status: LeadStatus.NEW,
-      notes: 'Met at Tech Summit San Francisco booth.',
-      createdAt: yesterday,
-      updatedAt: yesterday,
-      activities: {
-        create: [
-          {
-            type: ActivityType.NOTE,
-            content: 'Exchanged business cards at Tech Summit booth 402.',
-            createdAt: yesterday,
-          }
-        ]
-      }
-    }
-  });
-
-  console.log(`✅ Database successfully seeded with 8 sample leads!`);
+  console.log('✅ Database successfully seeded with users and leads!');
 }
 
 main()

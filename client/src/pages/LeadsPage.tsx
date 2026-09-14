@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
-import { Lead, LeadFilters, LeadStatus } from '../types/crm';
+import { Lead, LeadFilters, LeadStatus, FollowUp } from '../types/crm';
 import { StatusBadge, SourceBadge, FollowUpStatusBadge } from '../components/common/Badge';
 import { LeadFormModal } from '../components/leads/LeadFormModal';
+import { FollowUpOutcomeModal } from '../components/leads/FollowUpOutcomeModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { useToast } from '../components/common/Toast';
 import { Link } from 'react-router-dom';
@@ -22,6 +23,7 @@ import {
   Phone,
   Loader2,
   ArrowUpDown,
+  CheckCircle2,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -45,6 +47,7 @@ export const LeadsPage: React.FC = () => {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [deletingLead, setDeletingLead] = useState<Lead | null>(null);
+  const [completingFollowUp, setCompletingFollowUp] = useState<FollowUp | null>(null);
 
   // Debounce search input
   useEffect(() => {
@@ -94,6 +97,20 @@ export const LeadsPage: React.FC = () => {
     },
     onError: (err: Error) => {
       toast(err.message || 'Failed to update status', 'error');
+    },
+  });
+
+  const toggleFollowUpMutation = useMutation({
+    mutationFn: ({ followUpId, completionNote }: { followUpId: string; completionNote?: string }) =>
+      api.toggleFollowUpCompletion(followUpId, completionNote),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      toast('Follow-up marked as completed');
+      setCompletingFollowUp(null);
+    },
+    onError: (err: Error) => {
+      toast(err.message || 'Failed to complete follow-up', 'error');
     },
   });
 
@@ -346,17 +363,27 @@ export const LeadsPage: React.FC = () => {
                         </select>
                       </td>
 
-                      {/* Next Follow Up */}
+                      {/* Next Follow Up with Quick Complete Action */}
                       <td className="py-3.5 px-4">
                         {nextFollowUp ? (
-                          <div className="flex flex-col gap-1">
-                            <FollowUpStatusBadge
-                              dueDate={nextFollowUp.dueDate}
-                              isCompleted={nextFollowUp.isCompleted}
-                            />
-                            <span className="text-xs text-slate-500 truncate max-w-[150px]">
-                              {nextFollowUp.title} ({format(new Date(nextFollowUp.dueDate), 'MMM d')})
-                            </span>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex flex-col gap-1 min-w-0">
+                              <FollowUpStatusBadge
+                                dueDate={nextFollowUp.dueDate}
+                                isCompleted={nextFollowUp.isCompleted}
+                              />
+                              <span className="text-xs text-slate-500 truncate max-w-[140px]">
+                                {nextFollowUp.title} ({format(new Date(nextFollowUp.dueDate), 'MMM d')})
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => setCompletingFollowUp(nextFollowUp)}
+                              className="px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded flex items-center gap-1 transition-all shrink-0"
+                              title="Mark Follow-up Completed & Record Outcome Note"
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                              <span>Complete</span>
+                            </button>
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">None scheduled</span>
@@ -436,6 +463,22 @@ export const LeadsPage: React.FC = () => {
           isOpen={Boolean(editingLead)}
           lead={editingLead}
           onClose={() => setEditingLead(null)}
+        />
+      )}
+
+      {/* Complete Follow Up Outcome Modal */}
+      {completingFollowUp && (
+        <FollowUpOutcomeModal
+          isOpen={Boolean(completingFollowUp)}
+          onClose={() => setCompletingFollowUp(null)}
+          onConfirm={(note) =>
+            toggleFollowUpMutation.mutate({
+              followUpId: completingFollowUp.id,
+              completionNote: note,
+            })
+          }
+          title={completingFollowUp.title}
+          isLoading={toggleFollowUpMutation.isPending}
         />
       )}
 

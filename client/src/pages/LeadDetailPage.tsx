@@ -5,6 +5,7 @@ import { api } from '../services/api';
 import { StatusBadge, SourceBadge, FollowUpStatusBadge } from '../components/common/Badge';
 import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { FollowUpModal } from '../components/leads/FollowUpModal';
+import { FollowUpOutcomeModal } from '../components/leads/FollowUpOutcomeModal';
 import { NoteModal } from '../components/leads/NoteModal';
 import { ConfirmDialog } from '../components/common/ConfirmDialog';
 import { useToast } from '../components/common/Toast';
@@ -14,19 +15,18 @@ import {
   Building,
   Mail,
   Phone,
-  Calendar,
   Clock,
   Edit2,
   Trash2,
   Plus,
   MessageSquare,
   CheckCircle2,
-  XCircle,
   FileText,
-  User,
+  User as UserIcon,
   History,
-  AlertCircle,
   Loader2,
+  UserCheck,
+  CheckSquare,
 } from 'lucide-react';
 import { format } from 'date-fns';
 
@@ -40,6 +40,7 @@ export const LeadDetailPage: React.FC = () => {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isFollowUpModalOpen, setIsFollowUpModalOpen] = useState(false);
   const [editingFollowUp, setEditingFollowUp] = useState<FollowUp | null>(null);
+  const [completingFollowUp, setCompletingFollowUp] = useState<FollowUp | null>(null);
   const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   const [deletingFollowUpId, setDeletingFollowUpId] = useState<string | null>(null);
@@ -77,12 +78,14 @@ export const LeadDetailPage: React.FC = () => {
   });
 
   const toggleFollowUpMutation = useMutation({
-    mutationFn: (followUpId: string) => api.toggleFollowUpCompletion(followUpId),
+    mutationFn: ({ followUpId, completionNote }: { followUpId: string; completionNote?: string }) =>
+      api.toggleFollowUpCompletion(followUpId, completionNote),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['lead', id] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast('Follow-up status updated');
+      setCompletingFollowUp(null);
     },
     onError: (err: Error) => {
       toast(err.message || 'Failed to toggle follow-up', 'error');
@@ -185,7 +188,7 @@ export const LeadDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Grid: Left side Lead Info & Follow-ups, Right side Timeline */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (Lead Info & Follow-ups) */}
         <div className="lg:col-span-1 space-y-6">
@@ -223,6 +226,14 @@ export const LeadDetailPage: React.FC = () => {
                 <span className="font-medium text-slate-800 flex items-center mt-0.5">
                   <Phone className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
                   {lead.phone || <span className="text-slate-400 italic">Not provided</span>}
+                </span>
+              </div>
+
+              <div>
+                <span className="text-xs text-slate-400 block font-medium">Added By</span>
+                <span className="font-medium text-slate-800 flex items-center mt-0.5">
+                  <UserIcon className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
+                  {lead.createdBy?.name || <span className="text-slate-400 italic">System / Direct</span>}
                 </span>
               </div>
 
@@ -298,20 +309,22 @@ export const LeadDetailPage: React.FC = () => {
                       className="p-3 rounded-lg border border-slate-200 bg-slate-50/50 space-y-2"
                     >
                       <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-2">
-                          <button
-                            onClick={() => toggleFollowUpMutation.mutate(item.id)}
-                            className="mt-0.5 text-slate-400 hover:text-emerald-600 transition-colors"
-                            title="Mark Completed"
-                          >
-                            <CheckCircle2 className="w-4 h-4" />
-                          </button>
-                          <div>
-                            <h4 className="font-semibold text-slate-900 text-xs">{item.title}</h4>
-                            {item.description && (
-                              <p className="text-xs text-slate-500 mt-0.5">{item.description}</p>
-                            )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-bold text-slate-900 text-xs">{item.title}</h4>
+                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-200 text-slate-700">
+                              {item.type}
+                            </span>
                           </div>
+                          {item.description && (
+                            <p className="text-xs text-slate-500 mt-1">{item.description}</p>
+                          )}
+                          {item.assignedTo && (
+                            <span className="inline-flex items-center text-[10px] text-indigo-600 font-medium mt-1">
+                              <UserCheck className="w-3 h-3 mr-1" />
+                              Assigned to: {item.assignedTo.name}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center gap-1">
@@ -320,30 +333,44 @@ export const LeadDetailPage: React.FC = () => {
                               setEditingFollowUp(item);
                               setIsFollowUpModalOpen(true);
                             }}
-                            className="text-slate-400 hover:text-amber-600 p-1"
+                            className="text-slate-400 hover:text-amber-600 p-1 rounded hover:bg-amber-50"
+                            title="Edit Follow-up"
                           >
                             <Edit2 className="w-3.5 h-3.5" />
                           </button>
                           <button
                             onClick={() => setDeletingFollowUpId(item.id)}
-                            className="text-slate-400 hover:text-rose-600 p-1"
+                            className="text-slate-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50"
+                            title="Delete Follow-up"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between text-[11px]">
-                        <FollowUpStatusBadge dueDate={item.dueDate} isCompleted={false} />
-                        <span className="text-slate-500 font-medium">
-                          {format(new Date(item.dueDate), 'MMM d, yyyy')}
-                          {item.dueTime ? ` @ ${item.dueTime}` : ''}
-                        </span>
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 mt-2">
+                        <div className="flex items-center gap-2">
+                          <FollowUpStatusBadge dueDate={item.dueDate} isCompleted={false} />
+                          <span className="text-xs text-slate-500 font-medium">
+                            {format(new Date(item.dueDate), 'MMM d, yyyy')}
+                            {item.dueTime ? ` @ ${item.dueTime}` : ''}
+                          </span>
+                        </div>
+
+                        {/* Prominent Mark Complete Button */}
+                        <button
+                          onClick={() => setCompletingFollowUp(item)}
+                          className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-95"
+                          title="Mark Completed & Record Outcome Note"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Mark Completed</span>
+                        </button>
                       </div>
                     </div>
                   ))}
 
-                  {/* Completed Follow-ups */}
+                  {/* Completed Follow-ups with Outcome Notes */}
                   {completedFollowUps.length > 0 && (
                     <div className="pt-3 border-t border-slate-100">
                       <span className="text-xs font-semibold text-slate-400 block mb-2">
@@ -352,21 +379,46 @@ export const LeadDetailPage: React.FC = () => {
                       {completedFollowUps.map((item) => (
                         <div
                           key={item.id}
-                          className="p-2.5 rounded-lg bg-emerald-50/40 border border-emerald-100 text-xs flex items-center justify-between mb-2 opacity-80 hover:opacity-100 transition-opacity"
+                          className="p-3 rounded-lg bg-emerald-50/50 border border-emerald-200/80 text-xs space-y-1 mb-2"
                         >
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => toggleFollowUpMutation.mutate(item.id)}
-                              className="text-emerald-600"
-                              title="Re-open task"
-                            >
-                              <CheckCircle2 className="w-4 h-4 fill-emerald-100" />
-                            </button>
-                            <span className="line-through text-slate-600 font-medium">
-                              {item.title}
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() =>
+                                  toggleFollowUpMutation.mutate({ followUpId: item.id })
+                                }
+                                className="text-emerald-600"
+                                title="Re-open task"
+                              >
+                                <CheckCircle2 className="w-4 h-4 fill-emerald-100" />
+                              </button>
+                              <span className="font-semibold text-slate-800">{item.title}</span>
+                            </div>
+                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                              Completed
                             </span>
                           </div>
-                          <span className="text-[10px] text-emerald-700">Done</span>
+
+                          {/* Outcome Note */}
+                          {item.completionNote && (
+                            <div className="mt-1 pl-6 pt-1 border-t border-emerald-200/60">
+                              <span className="text-[10px] font-bold uppercase text-emerald-800 block">
+                                Outcome Note:
+                              </span>
+                              <p className="text-slate-700 italic text-[11px] leading-relaxed">
+                                "{item.completionNote}"
+                              </p>
+                            </div>
+                          )}
+
+                          {item.completedBy && (
+                            <div className="text-[10px] text-slate-500 pt-1 flex justify-between">
+                              <span>Completed by: {item.completedBy.name}</span>
+                              {item.completedAt && (
+                                <span>{format(new Date(item.completedAt), 'MMM d, h:mm a')}</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -448,6 +500,21 @@ export const LeadDetailPage: React.FC = () => {
             setIsFollowUpModalOpen(false);
             setEditingFollowUp(null);
           }}
+        />
+      )}
+
+      {completingFollowUp && (
+        <FollowUpOutcomeModal
+          isOpen={Boolean(completingFollowUp)}
+          onClose={() => setCompletingFollowUp(null)}
+          onConfirm={(note) =>
+            toggleFollowUpMutation.mutate({
+              followUpId: completingFollowUp.id,
+              completionNote: note,
+            })
+          }
+          title={completingFollowUp.title}
+          isLoading={toggleFollowUpMutation.isPending}
         />
       )}
 

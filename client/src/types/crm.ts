@@ -21,6 +21,19 @@ export type ActivityType =
   | 'STATUS_CHANGE'
   | 'SYSTEM';
 
+export interface User {
+  id: string;
+  name: string;
+  email: string;
+  userRight: number; // 1 = Super Admin, 0 = Normal User
+  createdAt?: string;
+  updatedAt?: string;
+  _count?: {
+    createdLeads?: number;
+    assignedFollowUps?: number;
+  };
+}
+
 export interface FollowUp {
   id: string;
   leadId: string;
@@ -30,9 +43,16 @@ export interface FollowUp {
   dueTime?: string | null;
   type: FollowUpType;
   isCompleted: boolean;
+  completionNote?: string | null;
   completedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  createdById?: string | null;
+  createdBy?: User | null;
+  assignedToId?: string | null;
+  assignedTo?: User | null;
+  completedById?: string | null;
+  completedBy?: User | null;
   lead?: {
     id: string;
     name: string;
@@ -58,6 +78,8 @@ export interface Lead {
   source: LeadSource;
   status: LeadStatus;
   notes?: string | null;
+  createdById?: string | null;
+  createdBy?: User | null;
   createdAt: string;
   updatedAt: string;
   followUps?: FollowUp[];

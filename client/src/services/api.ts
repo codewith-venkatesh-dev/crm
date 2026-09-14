@@ -5,21 +5,38 @@ import {
   FollowUp,
   Activity,
   DashboardData,
+  User,
 } from '../types/crm';
 
 const API_BASE_URL = '/api';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
+  const token = localStorage.getItem('crm_jwt_token');
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
   const res = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
     ...options,
+    headers: {
+      ...headers,
+      ...(options?.headers || {}),
+    },
   });
 
   const json = await res.json();
 
   if (!res.ok || !json.success) {
+    if (res.status === 401 && !url.includes('/auth/login')) {
+      localStorage.removeItem('crm_jwt_token');
+      localStorage.removeItem('crm_user');
+      window.location.href = '/login';
+    }
     const errorMsg =
       json.errors?.[0]?.message || json.message || `Request failed with status ${res.status}`;
     throw new Error(errorMsg);
@@ -29,6 +46,62 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  // Auth APIs
+  login: async (email: string, password: string): Promise<{ token: string; user: User }> => {
+    const res = await fetchJson<{ success: boolean; data: { token: string; user: User } }>(
+      `${API_BASE_URL}/auth/login`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ email, password }),
+      }
+    );
+    return res.data;
+  },
+
+  getMe: async (): Promise<User> => {
+    const res = await fetchJson<{ success: boolean; data: User }>(`${API_BASE_URL}/auth/me`);
+    return res.data;
+  },
+
+  // User Management APIs
+  getUsers: async (): Promise<User[]> => {
+    const res = await fetchJson<{ success: boolean; data: User[] }>(`${API_BASE_URL}/users`);
+    return res.data;
+  },
+
+  createUser: async (data: {
+    name: string;
+    email: string;
+    password: string;
+    userRight: number;
+  }): Promise<User> => {
+    const res = await fetchJson<{ success: boolean; message: string; data: User }>(
+      `${API_BASE_URL}/users`,
+      {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }
+    );
+    return res.data;
+  },
+
+  updateUser: async (id: string, data: Partial<User> & { password?: string }): Promise<User> => {
+    const res = await fetchJson<{ success: boolean; message: string; data: User }>(
+      `${API_BASE_URL}/users/${id}`,
+      {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }
+    );
+    return res.data;
+  },
+
+  deleteUser: async (id: string): Promise<void> => {
+    await fetchJson<{ success: boolean; message: string }>(`${API_BASE_URL}/users/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
   // Dashboard API
   getDashboardSummary: async (): Promise<DashboardData> => {
     const res = await fetchJson<{ success: boolean; data: DashboardData }>(
@@ -113,6 +186,7 @@ export const api = {
       dueDate: string;
       dueTime?: string | null;
       type: string;
+      assignedToId?: string | null;
     }
   ): Promise<FollowUp> => {
     const res = await fetchJson<{ success: boolean; message: string; data: FollowUp }>(
@@ -136,11 +210,15 @@ export const api = {
     return res.data;
   },
 
-  toggleFollowUpCompletion: async (id: string): Promise<FollowUp> => {
+  toggleFollowUpCompletion: async (
+    id: string,
+    completionNote?: string
+  ): Promise<FollowUp> => {
     const res = await fetchJson<{ success: boolean; message: string; data: FollowUp }>(
       `${API_BASE_URL}/follow-ups/${id}/complete`,
       {
         method: 'PATCH',
+        body: JSON.stringify({ completionNote }),
       }
     );
     return res.data;

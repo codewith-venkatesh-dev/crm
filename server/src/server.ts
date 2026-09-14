@@ -1,18 +1,20 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import authRoutes from './routes/authRoutes';
+import userRoutes from './routes/userRoutes';
 import leadRoutes from './routes/leadRoutes';
 import followUpRoutes, { followUpDirectRouter } from './routes/followUpRoutes';
 import activityRoutes from './routes/activityRoutes';
 import dashboardRoutes from './routes/dashboardRoutes';
 import { errorHandler } from './middleware/errorHandler';
+import { authenticateJWT } from './middleware/authMiddleware';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Cross-origin and JSON body parsing
 app.use(cors({ origin: '*' }));
 app.use(express.json());
 
@@ -22,12 +24,16 @@ app.use((req, res, next) => {
   next();
 });
 
-// API Routes
-app.use('/api/leads', leadRoutes);
-app.use('/api/leads/:leadId/follow-ups', followUpRoutes);
-app.use('/api/follow-ups', followUpDirectRouter);
-app.use('/api/leads/:leadId/activities', activityRoutes);
-app.use('/api/dashboard', dashboardRoutes);
+// Public Auth Routes
+app.use('/api/auth', authRoutes);
+
+// Protected API Routes (Requires valid JWT token)
+app.use('/api/users', userRoutes);
+app.use('/api/leads', authenticateJWT, leadRoutes);
+app.use('/api/leads/:leadId/follow-ups', authenticateJWT, followUpRoutes);
+app.use('/api/follow-ups', authenticateJWT, followUpDirectRouter);
+app.use('/api/leads/:leadId/activities', authenticateJWT, activityRoutes);
+app.use('/api/dashboard', authenticateJWT, dashboardRoutes);
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {

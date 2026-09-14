@@ -1,7 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { FollowUpType, ActivityType } from '@prisma/client';
+import { AuthRequest } from '../middleware/authMiddleware';
 
 export const createFollowUpSchema = z.object({
   body: z.object({
@@ -12,6 +13,7 @@ export const createFollowUpSchema = z.object({
     }),
     dueTime: z.string().optional().nullable(),
     type: z.nativeEnum(FollowUpType).default(FollowUpType.TASK),
+    assignedToId: z.string().optional().nullable(),
   }),
 });
 
@@ -24,17 +26,24 @@ export const updateFollowUpSchema = z.object({
     }),
     dueTime: z.string().optional().nullable(),
     type: z.nativeEnum(FollowUpType).optional(),
+    assignedToId: z.string().optional().nullable(),
     isCompleted: z.boolean().optional(),
+    completionNote: z.string().optional().nullable(),
   }),
 });
 
-export async function getLeadFollowUps(req: Request, res: Response, next: NextFunction) {
+export async function getLeadFollowUps(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { leadId } = req.params;
 
     const followUps = await prisma.followUp.findMany({
       where: { leadId },
       orderBy: { dueDate: 'asc' },
+      include: {
+        createdBy: { select: { id: true, name: true, email: true } },
+        assignedTo: { select: { id: true, name: true, email: true } },
+        completedBy: { select: { id: true, name: true, email: true } },
+      },
     });
 
     return res.json({ success: true, data: followUps });
@@ -43,10 +52,10 @@ export async function getLeadFollowUps(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function createFollowUp(req: Request, res: Response, next: NextFunction) {
+export async function createFollowUp(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { leadId } = req.params;
-    const { title, description, dueDate, dueTime, type } = req.body;
+    const { title, description, dueDate, dueTime, type, assignedToId } = req.body;
 
     const lead = await prisma.lead.findUnique({ where: { id: leadId } });
     if (!lead) {
@@ -61,6 +70,12 @@ export async function createFollowUp(req: Request, res: Response, next: NextFunc
         dueDate: new Date(dueDate),
         dueTime: dueTime || null,
         type: type || FollowUpType.TASK,
+        createdById: req.user?.id || null,
+        assignedToId: assignedToId || req.user?.id || null,
+      },
+      include: {
+        createdBy: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
       },
     });
 
@@ -71,7 +86,9 @@ export async function createFollowUp(req: Request, res: Response, next: NextFunc
         type: ActivityType.SYSTEM,
         content: `Scheduled follow-up (${type || FollowUpType.TASK}): "${title}" for ${new Date(
           dueDate
-        ).toLocaleDateString()}${dueTime ? ` at ${dueTime}` : ''}.`,
+        ).toLocaleDateString()}${dueTime ? ` at ${dueTime}` : ''}${
+          req.user ? ` by ${req.user.name}` : ''
+        }.`,
       },
     });
 
@@ -85,7 +102,7 @@ export async function createFollowUp(req: Request, res: Response, next: NextFunc
   }
 }
 
-export async function updateFollowUp(req: Request, res: Response, next: NextFunction) {
+export async function updateFollowUp(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
     const existing = await prisma.followUp.findUnique({ where: { id } });
@@ -94,7 +111,7 @@ export async function updateFollowUp(req: Request, res: Response, next: NextFunc
       return res.status(404).json({ success: false, message: 'Follow-up not found' });
     }
 
-    const { title, description, dueDate, dueTime, type, isCompleted } = req.body;
+    const { title, description, dueDate, dueTime, type, assignedToId, isCompleted, completionNote } = req.body;
 
     const updated = await prisma.followUp.update({
       where: { id },
@@ -104,10 +121,18 @@ export async function updateFollowUp(req: Request, res: Response, next: NextFunc
         ...(dueDate && { dueDate: new Date(dueDate) }),
         ...(dueTime !== undefined && { dueTime: dueTime || null }),
         ...(type && { type }),
+        ...(assignedToId !== undefined && { assignedToId: assignedToId || null }),
         ...(isCompleted !== undefined && {
           isCompleted,
           completedAt: isCompleted ? new Date() : null,
+          completedById: isCompleted ? req.user?.id || null : null,
+          completionNote: isCompleted ? completionNote || null : null,
         }),
+      },
+      include: {
+        createdBy: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
+        completedBy: { select: { id: true, name: true } },
       },
     });
 
@@ -121,9 +146,11 @@ export async function updateFollowUp(req: Request, res: Response, next: NextFunc
   }
 }
 
-export async function toggleFollowUpCompletion(req: Request, res: Response, next: NextFunction) {
+export async function toggleFollowUpCompletion(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
+    const { completionNote } = req.body;
+
     const existing = await prisma.followUp.findUnique({ where: { id } });
 
     if (!existing) {
@@ -137,17 +164,27 @@ export async function toggleFollowUpCompletion(req: Request, res: Response, next
       data: {
         isCompleted: newCompleted,
         completedAt: newCompleted ? new Date() : null,
+        completedById: newCompleted ? req.user?.id || null : null,
+        completionNote: newCompleted ? completionNote || existing.completionNote : null,
+      },
+      include: {
+        createdBy: { select: { id: true, name: true } },
+        assignedTo: { select: { id: true, name: true } },
+        completedBy: { select: { id: true, name: true } },
       },
     });
 
-    // Create activity entry
+    // Create activity entry with outcome note
+    const userMarker = req.user ? ` by ${req.user.name}` : '';
+    const noteText = completionNote ? ` Outcome: "${completionNote}"` : '';
+
     await prisma.activity.create({
       data: {
         leadId: existing.leadId,
         type: ActivityType.SYSTEM,
         content: newCompleted
-          ? `Completed follow-up: "${existing.title}".`
-          : `Re-opened follow-up: "${existing.title}".`,
+          ? `Completed follow-up: "${existing.title}"${userMarker}.${noteText}`
+          : `Re-opened follow-up: "${existing.title}"${userMarker}.`,
       },
     });
 
@@ -161,7 +198,7 @@ export async function toggleFollowUpCompletion(req: Request, res: Response, next
   }
 }
 
-export async function deleteFollowUp(req: Request, res: Response, next: NextFunction) {
+export async function deleteFollowUp(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
     const existing = await prisma.followUp.findUnique({ where: { id } });

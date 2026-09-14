@@ -1,7 +1,10 @@
 import React, { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../services/api';
 import { StatusBadge, SourceBadge } from '../components/common/Badge';
+import { FollowUpOutcomeModal } from '../components/leads/FollowUpOutcomeModal';
+import { useToast } from '../components/common/Toast';
+import { FollowUp } from '../types/crm';
 import { Link } from 'react-router-dom';
 import {
   Users,
@@ -19,11 +22,28 @@ import { LeadFormModal } from '../components/leads/LeadFormModal';
 import { format } from 'date-fns';
 
 export const DashboardPage: React.FC = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
+  const [completingFollowUp, setCompletingFollowUp] = useState<FollowUp | null>(null);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.getDashboardSummary(),
+  });
+
+  const toggleFollowUpMutation = useMutation({
+    mutationFn: ({ followUpId, completionNote }: { followUpId: string; completionNote?: string }) =>
+      api.toggleFollowUpCompletion(followUpId, completionNote),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      toast('Follow-up marked as completed');
+      setCompletingFollowUp(null);
+    },
+    onError: (err: Error) => {
+      toast(err.message || 'Failed to complete follow-up', 'error');
+    },
   });
 
   if (isLoading) {
@@ -179,7 +199,7 @@ export const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Upcoming Follow-ups Widget */}
+        {/* Upcoming Follow-ups Widget with Direct Mark Complete Button */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between pb-4 border-b border-slate-100 mb-4">
@@ -199,24 +219,27 @@ export const DashboardPage: React.FC = () => {
                   const isOverdue = new Date(item.dueDate) < new Date(new Date().setHours(0,0,0,0));
 
                   return (
-                    <div key={item.id} className="py-3 flex items-center justify-between">
-                      <div>
+                    <div key={item.id} className="py-3.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-900 text-sm">{item.title}</span>
-                          <span className="text-xs text-slate-400">({item.type})</span>
+                          <span className="font-semibold text-slate-900 text-sm truncate">{item.title}</span>
+                          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 uppercase">
+                            {item.type}
+                          </span>
                         </div>
                         {item.lead && (
                           <Link
                             to={`/leads/${item.lead.id}`}
-                            className="text-xs text-indigo-600 hover:underline"
+                            className="text-xs text-indigo-600 hover:underline block truncate mt-0.5"
                           >
                             Lead: {item.lead.name} {item.lead.companyName ? `(${item.lead.companyName})` : ''}
                           </Link>
                         )}
                       </div>
-                      <div className="text-right">
+
+                      <div className="flex items-center gap-2 shrink-0">
                         <span
-                          className={`text-xs font-semibold px-2 py-0.5 rounded border ${
+                          className={`text-xs font-semibold px-2 py-1 rounded border ${
                             isOverdue
                               ? 'bg-rose-50 text-rose-700 border-rose-200'
                               : 'bg-sky-50 text-sky-700 border-sky-200'
@@ -224,6 +247,16 @@ export const DashboardPage: React.FC = () => {
                         >
                           {format(new Date(item.dueDate), 'MMM d')}
                         </span>
+
+                        {/* Direct Mark Completed Button */}
+                        <button
+                          onClick={() => setCompletingFollowUp(item)}
+                          className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-95"
+                          title="Mark Completed & Record Outcome Note"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                          <span>Complete</span>
+                        </button>
                       </div>
                     </div>
                   );
@@ -238,6 +271,21 @@ export const DashboardPage: React.FC = () => {
         <LeadFormModal
           isOpen={isAddLeadModalOpen}
           onClose={() => setIsAddLeadModalOpen(false)}
+        />
+      )}
+
+      {completingFollowUp && (
+        <FollowUpOutcomeModal
+          isOpen={Boolean(completingFollowUp)}
+          onClose={() => setCompletingFollowUp(null)}
+          onConfirm={(note) =>
+            toggleFollowUpMutation.mutate({
+              followUpId: completingFollowUp.id,
+              completionNote: note,
+            })
+          }
+          title={completingFollowUp.title}
+          isLoading={toggleFollowUpMutation.isPending}
         />
       )}
     </div>

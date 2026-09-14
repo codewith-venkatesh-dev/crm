@@ -1,7 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { prisma } from '../lib/prisma';
 import { z } from 'zod';
 import { LeadSource, LeadStatus, ActivityType, Prisma } from '@prisma/client';
+import { AuthRequest } from '../middleware/authMiddleware';
 
 export const createLeadSchema = z.object({
   body: z.object({
@@ -33,7 +34,7 @@ export const updateStatusSchema = z.object({
   }),
 });
 
-export async function getLeads(req: Request, res: Response, next: NextFunction) {
+export async function getLeads(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const {
       search,
@@ -52,7 +53,6 @@ export async function getLeads(req: Request, res: Response, next: NextFunction) 
 
     const where: Prisma.LeadWhereInput = {};
 
-    // Search query across name, companyName, email, phone
     if (search && typeof search === 'string' && search.trim() !== '') {
       const q = search.trim();
       where.OR = [
@@ -63,17 +63,14 @@ export async function getLeads(req: Request, res: Response, next: NextFunction) 
       ];
     }
 
-    // Status filter
     if (status && typeof status === 'string' && status !== 'ALL') {
       where.status = status as LeadStatus;
     }
 
-    // Source filter
     if (source && typeof source === 'string' && source !== 'ALL') {
       where.source = source as LeadSource;
     }
 
-    // Follow-up state filter
     const now = new Date();
     if (followUpState && typeof followUpState === 'string') {
       if (followUpState === 'overdue') {
@@ -97,7 +94,6 @@ export async function getLeads(req: Request, res: Response, next: NextFunction) 
       }
     }
 
-    // Dynamic sorting
     const validSortFields = ['createdAt', 'updatedAt', 'name', 'companyName', 'status'];
     const field = validSortFields.includes(sortBy as string) ? (sortBy as string) : 'createdAt';
     const order = sortOrder === 'asc' ? 'asc' : 'desc';
@@ -109,8 +105,14 @@ export async function getLeads(req: Request, res: Response, next: NextFunction) 
         skip,
         take: limitNum,
         include: {
+          createdBy: {
+            select: { id: true, name: true, email: true },
+          },
           followUps: {
             orderBy: { dueDate: 'asc' },
+            include: {
+              assignedTo: { select: { id: true, name: true } },
+            },
           },
           _count: {
             select: { followUps: true, activities: true },
@@ -135,14 +137,22 @@ export async function getLeads(req: Request, res: Response, next: NextFunction) 
   }
 }
 
-export async function getLeadById(req: Request, res: Response, next: NextFunction) {
+export async function getLeadById(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
     const lead = await prisma.lead.findUnique({
       where: { id },
       include: {
+        createdBy: {
+          select: { id: true, name: true, email: true },
+        },
         followUps: {
           orderBy: { dueDate: 'asc' },
+          include: {
+            createdBy: { select: { id: true, name: true } },
+            assignedTo: { select: { id: true, name: true } },
+            completedBy: { select: { id: true, name: true } },
+          },
         },
         activities: {
           orderBy: { createdAt: 'desc' },
@@ -160,9 +170,10 @@ export async function getLeadById(req: Request, res: Response, next: NextFunctio
   }
 }
 
-export async function createLead(req: Request, res: Response, next: NextFunction) {
+export async function createLead(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { name, companyName, email, phone, source, status, notes } = req.body;
+    const creatorName = req.user ? req.user.name : 'System';
 
     const newLead = await prisma.lead.create({
       data: {
@@ -173,14 +184,16 @@ export async function createLead(req: Request, res: Response, next: NextFunction
         source,
         status: status || LeadStatus.NEW,
         notes: notes || null,
+        createdById: req.user?.id || null,
         activities: {
           create: {
             type: ActivityType.SYSTEM,
-            content: `Lead created manually with source "${source}" and status "${status || LeadStatus.NEW}".`,
+            content: `Lead created by ${creatorName} with source "${source}" and status "${status || LeadStatus.NEW}".`,
           },
         },
       },
       include: {
+        createdBy: { select: { id: true, name: true, email: true } },
         followUps: true,
         activities: true,
       },
@@ -196,7 +209,7 @@ export async function createLead(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function updateLead(req: Request, res: Response, next: NextFunction) {
+export async function updateLead(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
     const existing = await prisma.lead.findUnique({ where: { id } });
@@ -206,6 +219,7 @@ export async function updateLead(req: Request, res: Response, next: NextFunction
     }
 
     const { name, companyName, email, phone, source, status, notes } = req.body;
+    const updaterName = req.user ? req.user.name : 'System';
 
     const updatedLead = await prisma.lead.update({
       where: { id },
@@ -220,11 +234,12 @@ export async function updateLead(req: Request, res: Response, next: NextFunction
         activities: {
           create: {
             type: ActivityType.NOTE,
-            content: 'Lead details updated.',
+            content: `Lead details updated by ${updaterName}.`,
           },
         },
       },
       include: {
+        createdBy: { select: { id: true, name: true, email: true } },
         followUps: true,
         activities: true,
       },
@@ -240,7 +255,7 @@ export async function updateLead(req: Request, res: Response, next: NextFunction
   }
 }
 
-export async function updateLeadStatus(req: Request, res: Response, next: NextFunction) {
+export async function updateLeadStatus(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -254,6 +269,8 @@ export async function updateLeadStatus(req: Request, res: Response, next: NextFu
       return res.json({ success: true, data: existing });
     }
 
+    const updaterName = req.user ? req.user.name : 'User';
+
     const updatedLead = await prisma.lead.update({
       where: { id },
       data: {
@@ -261,11 +278,12 @@ export async function updateLeadStatus(req: Request, res: Response, next: NextFu
         activities: {
           create: {
             type: ActivityType.STATUS_CHANGE,
-            content: `Status changed from ${existing.status} to ${status}.`,
+            content: `Status changed from ${existing.status} to ${status} by ${updaterName}.`,
           },
         },
       },
       include: {
+        createdBy: { select: { id: true, name: true, email: true } },
         followUps: true,
         activities: true,
       },
@@ -281,7 +299,7 @@ export async function updateLeadStatus(req: Request, res: Response, next: NextFu
   }
 }
 
-export async function deleteLead(req: Request, res: Response, next: NextFunction) {
+export async function deleteLead(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { id } = req.params;
     const existing = await prisma.lead.findUnique({ where: { id } });

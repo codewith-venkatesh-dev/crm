@@ -32,12 +32,14 @@ export async function getDashboardSummary(req: Request, res: Response, next: Nex
         where: {
           isCompleted: false,
           dueDate: { lt: startOfToday },
+          lead: { id: { not: '' } },
         },
       }),
       prisma.followUp.count({
         where: {
           isCompleted: false,
           dueDate: { gte: startOfToday, lte: endOfToday },
+          lead: { id: { not: '' } },
         },
       }),
       prisma.lead.findMany({
@@ -52,7 +54,10 @@ export async function getDashboardSummary(req: Request, res: Response, next: Nex
         },
       }),
       prisma.followUp.findMany({
-        where: { isCompleted: false },
+        where: {
+          isCompleted: false,
+          lead: { id: { not: '' } },
+        },
         take: 5,
         orderBy: { dueDate: 'asc' },
         include: {

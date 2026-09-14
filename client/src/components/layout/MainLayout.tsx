@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { NavLink, Outlet, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -8,12 +8,18 @@ import {
   Building2,
   Menu,
   X,
-  Sparkles,
+  ShieldCheck,
+  LogOut,
+  User as UserIcon,
 } from 'lucide-react';
 import { LeadFormModal } from '../leads/LeadFormModal';
+import { useAuth } from '../../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, isSuperAdmin, logout } = useAuth();
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
 
@@ -21,6 +27,7 @@ export const MainLayout: React.FC = () => {
     if (location.pathname === '/') return 'Dashboard';
     if (location.pathname === '/leads') return 'Lead Directory';
     if (location.pathname === '/pipeline') return 'Sales Pipeline';
+    if (location.pathname === '/users') return 'User Rights Management';
     if (location.pathname.startsWith('/leads/')) return 'Lead Overview';
     return 'CRM';
   };
@@ -30,6 +37,15 @@ export const MainLayout: React.FC = () => {
     { to: '/leads', label: 'Leads', icon: Users },
     { to: '/pipeline', label: 'Pipeline', icon: Kanban },
   ];
+
+  if (isSuperAdmin) {
+    navItems.push({ to: '/users', label: 'User Rights', icon: ShieldCheck });
+  }
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
@@ -101,12 +117,31 @@ export const MainLayout: React.FC = () => {
           })}
         </nav>
 
-        {/* Footer info */}
-        <div className="p-4 border-t border-slate-800">
-          <div className="flex items-center gap-2 text-xs text-slate-400 bg-slate-800/50 p-2.5 rounded-lg">
-            <Sparkles className="w-4 h-4 text-amber-400 shrink-0" />
-            <span>Production CRM v1.0</span>
-          </div>
+        {/* Logged in User Profile Footer */}
+        <div className="p-4 border-t border-slate-800 space-y-3">
+          {user && (
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                  {user.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-slate-200 truncate">{user.name}</p>
+                  <p className="text-[10px] text-slate-400 truncate">
+                    {user.userRight === 1 ? '⚡ Super Admin' : 'Sales Agent'}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition-colors"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
         </div>
       </aside>
 
@@ -117,6 +152,12 @@ export const MainLayout: React.FC = () => {
           <h2 className="text-xl font-bold text-slate-900 tracking-tight">{getPageTitle()}</h2>
 
           <div className="flex items-center gap-3">
+            {user && (
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
+                <UserIcon className="w-3.5 h-3.5 text-indigo-600" />
+                {user.name} ({user.userRight === 1 ? 'Super Admin' : 'Agent'})
+              </span>
+            )}
             <button
               onClick={() => setIsAddLeadModalOpen(true)}
               className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm transition-all"

@@ -2,7 +2,7 @@ import React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../common/Modal';
 import { api } from '../../services/api';
 import { FollowUp, FollowUpType } from '../../types/crm';
@@ -15,6 +15,7 @@ const followUpSchema = z.object({
   dueDate: z.string().min(1, 'Due date is required'),
   dueTime: z.string().optional().nullable(),
   type: z.enum(['CALL', 'EMAIL', 'MEETING', 'WHATSAPP', 'TASK', 'OTHER']),
+  assignedToId: z.string().optional().nullable(),
 });
 
 type FollowUpFormData = z.infer<typeof followUpSchema>;
@@ -36,6 +37,11 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
+  const { data: users } = useQuery({
+    queryKey: ['users'],
+    queryFn: () => api.getUsers(),
+  });
+
   const defaultDateStr = followUp
     ? new Date(followUp.dueDate).toISOString().split('T')[0]
     : new Date().toISOString().split('T')[0];
@@ -52,6 +58,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
       dueDate: defaultDateStr,
       dueTime: followUp?.dueTime || '10:00',
       type: (followUp?.type as FollowUpType) || 'TASK',
+      assignedToId: followUp?.assignedToId || '',
     },
   });
 
@@ -87,7 +94,7 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
       isOpen={isOpen}
       onClose={onClose}
       title={isEditing ? 'Edit Follow-up Reminder' : 'Schedule Follow-up'}
-      subtitle="Set a reminder date and interaction type for this lead"
+      subtitle="Set a reminder date, interaction type, and assigned team member"
       maxWidth="md"
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -149,16 +156,35 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
           </div>
         </div>
 
-        {/* Optional Time */}
-        <div>
-          <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
-            Due Time (Optional)
-          </label>
-          <input
-            type="time"
-            {...register('dueTime')}
-            className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          />
+        {/* Assign To & Time Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Assign Follow-up To
+            </label>
+            <select
+              {...register('assignedToId')}
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+            >
+              <option value="">(Self / Default)</option>
+              {users?.map((usr) => (
+                <option key={usr.id} value={usr.id}>
+                  {usr.name} ({usr.userRight === 1 ? 'Super Admin' : 'Agent'})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-700 uppercase tracking-wider mb-1">
+              Due Time (Optional)
+            </label>
+            <input
+              type="time"
+              {...register('dueTime')}
+              className="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            />
+          </div>
         </div>
 
         {/* Description */}

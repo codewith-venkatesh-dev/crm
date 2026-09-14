@@ -45,17 +45,37 @@ enum ActivityType {
   SYSTEM
 }
 
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  password  String
+  userRight Int      @default(0) // 1 = Super Admin, 0 = Normal User
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  createdLeads       Lead[]     @relation("LeadCreatedBy")
+  createdFollowUps   FollowUp[] @relation("FollowUpCreatedBy")
+  assignedFollowUps  FollowUp[] @relation("FollowUpAssignedTo")
+  completedFollowUps FollowUp[] @relation("FollowUpCompletedBy")
+
+  @@map("users")
+}
+
 model Lead {
-  id          String      @id @default(uuid())
+  id          String     @id @default(uuid())
   name        String
   companyName String?
   email       String?
   phone       String?
   source      LeadSource
-  status      LeadStatus  @default(NEW)
-  notes       String?     @db.Text
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
+  status      LeadStatus @default(NEW)
+  notes       String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  createdById String?
+  createdBy   User?   @relation("LeadCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   followUps  FollowUp[]
   activities Activity[]
@@ -63,26 +83,39 @@ model Lead {
   @@index([status])
   @@index([source])
   @@index([name])
+  @@index([createdById])
   @@map("leads")
 }
 
 model FollowUp {
-  id          String       @id @default(uuid())
-  leadId      String
-  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
-  title       String
-  description String?      @db.Text
-  dueDate     DateTime
-  dueTime     String?
-  type        FollowUpType @default(TASK)
-  isCompleted Boolean      @default(false)
-  completedAt DateTime?
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  id             String       @id @default(uuid())
+  leadId         String
+  lead           Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  title          String
+  description    String?      @db.Text
+  dueDate        DateTime
+  dueTime        String?
+  type           FollowUpType @default(TASK)
+  isCompleted    Boolean      @default(false)
+  completionNote String?      @db.Text
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  createdById String?
+  createdBy   User?   @relation("FollowUpCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  assignedToId String?
+  assignedTo   User?   @relation("FollowUpAssignedTo", fields: [assignedToId], references: [id], onDelete: SetNull)
+
+  completedById String?
+  completedBy   User?   @relation("FollowUpCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
   @@index([leadId])
   @@index([dueDate])
   @@index([isCompleted])
+  @@index([createdById])
+  @@index([assignedToId])
   @@map("follow_ups")
 }
 
