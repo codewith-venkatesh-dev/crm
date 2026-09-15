@@ -225,7 +225,13 @@ export const LeadDetailPage: React.FC = () => {
                 <span className="text-xs text-slate-400 block font-medium">Phone Number</span>
                 <span className="font-medium text-slate-800 flex items-center mt-0.5">
                   <Phone className="w-4 h-4 mr-2 text-slate-400 shrink-0" />
-                  {lead.phone || <span className="text-slate-400 italic">Not provided</span>}
+                  {lead.phone ? (
+                    <a href={`tel:${lead.phone}`} className="text-indigo-600 hover:underline">
+                      {lead.phone}
+                    </a>
+                  ) : (
+                    <span className="text-slate-400 italic">Not provided</span>
+                  )}
                 </span>
               </div>
 
@@ -394,7 +400,7 @@ export const LeadDetailPage: React.FC = () => {
                               </button>
                               <span className="font-semibold text-slate-800">{item.title}</span>
                             </div>
-                            <span className="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
+                            <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">
                               Completed
                             </span>
                           </div>
@@ -402,17 +408,17 @@ export const LeadDetailPage: React.FC = () => {
                           {/* Outcome Note */}
                           {item.completionNote && (
                             <div className="mt-1 pl-6 pt-1 border-t border-emerald-200/60">
-                              <span className="text-[10px] font-bold uppercase text-emerald-800 block">
+                              <span className="text-[13px] font-bold uppercase text-emerald-800 block">
                                 Outcome Note:
                               </span>
-                              <p className="text-slate-700 italic text-[11px] leading-relaxed">
+                              <p className="text-slate-700 italic text-[12px] leading-relaxed">
                                 "{item.completionNote}"
                               </p>
                             </div>
                           )}
 
                           {item.completedBy && (
-                            <div className="text-[10px] text-slate-500 pt-1 flex justify-between">
+                            <div className="text-[12px] text-slate-500 pt-1 flex justify-between">
                               <span>Completed by: {item.completedBy.name}</span>
                               {item.completedAt && (
                                 <span>{format(new Date(item.completedAt), 'MMM d, h:mm a')}</span>
@@ -453,7 +459,7 @@ export const LeadDetailPage: React.FC = () => {
                 <p className="text-xs">No activity recorded for this lead yet.</p>
               </div>
             ) : (
-              <div className="relative pl-6 border-l-2 border-slate-200 space-y-6">
+              <div className="relative pl-6 border-l-2 border-slate-200 space-y-6 ">
                 {lead.activities.map((act) => {
                   return (
                     <div key={act.id} className="relative group">

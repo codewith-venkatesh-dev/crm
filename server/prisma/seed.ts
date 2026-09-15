@@ -18,7 +18,7 @@ async function main() {
   // 1. Create Super Admin User (userRight = 1)
   const adminUser = await prisma.user.create({
     data: {
-      name: 'Alex Vance (Super Admin)',
+      name: 'Anu (Super Admin)',
       email: 'admin@crm.com',
       password: passwordHash,
       userRight: 1,
@@ -28,7 +28,7 @@ async function main() {
   // 2. Create Normal Sales Agent User (userRight = 0)
   const agentUser = await prisma.user.create({
     data: {
-      name: 'Jordan Lee (Sales Representative)',
+      name: 'Rajan (Sales Representative)',
       email: 'agent@crm.com',
       password: passwordHash,
       userRight: 0,
@@ -53,7 +53,7 @@ async function main() {
       name: 'Sarah Jenkins',
       companyName: 'Apex Financial Technologies',
       email: 'sarah.j@apexfintech.io',
-      phone: '+1 (555) 234-5678',
+      phone: '+91 9876543210',
       source: LeadSource.WEBSITE,
       status: LeadStatus.CONTACTED,
       notes: 'Interested in enterprise seat licensing. Demo was delivered last Thursday.',
@@ -115,7 +115,7 @@ async function main() {
       name: 'Michael Chen',
       companyName: 'Horizon Logistics Corp',
       email: 'm.chen@horizonlogistics.com',
-      phone: '+1 (555) 876-5432',
+      phone: '+91 9876543210',
       source: LeadSource.LINKEDIN,
       status: LeadStatus.NEGOTIATING,
       notes: 'Evaluating contract terms. Security review complete.',
@@ -161,10 +161,10 @@ async function main() {
   // 3. Lead: Closed Lead with completed follow-up outcome note
   await prisma.lead.create({
     data: {
-      name: 'Elena Rostova',
+      name: 'Ravi Kumar',
       companyName: 'Vanguard Retail Group',
       email: 'elena.rostova@vanguardretail.com',
-      phone: '+1 (555) 345-6789',
+      phone: '+91 9876543210',
       source: LeadSource.REFERRAL,
       status: LeadStatus.CLOSED,
       notes: 'Deal closed! Annual subscription paid. Onboarding scheduled.',
@@ -218,10 +218,10 @@ async function main() {
   // 4. Lead: New Lead
   await prisma.lead.create({
     data: {
-      name: 'David Miller',
+      name: 'John Doe',
       companyName: 'Nexus Cloud Systems',
-      email: 'dave@nexuscloud.io',
-      phone: '+1 (555) 987-6543',
+      email: 'john.doe@nexuscloud.io',
+      phone: '+91 9876543210',
       source: LeadSource.COLD_EMAIL,
       status: LeadStatus.NEW,
       notes: 'Responded positively to cold outreach campaign. Asking for product specs.',

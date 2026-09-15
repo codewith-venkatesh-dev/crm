@@ -8,67 +8,56 @@ export default {
   theme: {
     extend: {
       colors: {
-        border: 'hsl(var(--border))',
-        input: 'hsl(var(--input))',
-        ring: 'hsl(var(--ring))',
-        background: 'hsl(var(--background))',
-        foreground: 'hsl(var(--foreground))',
-        primary: {
-          DEFAULT: 'hsl(var(--primary))',
-          foreground: 'hsl(var(--primary-foreground))',
+        // Core Neutral Palette Specification
+        appBg: '#F5F6F8',
+        primarySurface: '#FFFFFF',
+        secondarySurface: '#F8FAFC',
+        primaryText: '#1E293B',
+        secondaryText: '#64748B',
+        borderColor: '#E2E8F0',
+
+        // Primary Accent Colors
+        primaryAccent: {
+          DEFAULT: '#4F46E5',
+          hover: '#4338CA',
         },
-        secondary: {
-          DEFAULT: 'hsl(var(--secondary))',
-          foreground: 'hsl(var(--secondary-foreground))',
-        },
-        muted: {
-          DEFAULT: 'hsl(var(--muted))',
-          foreground: 'hsl(var(--muted-foreground))',
-        },
-        accent: {
-          DEFAULT: 'hsl(var(--accent))',
-          foreground: 'hsl(var(--accent-foreground))',
-        },
-        card: {
-          DEFAULT: 'hsl(var(--card))',
-          foreground: 'hsl(var(--card-foreground))',
-        },
-        // Lead status custom semantic palettes
-        leadNew: {
+
+        // Status Colors (Exclusively for badges & semantic indicators)
+        statusNew: {
           DEFAULT: '#3B82F6',
           bg: '#EFF6FF',
           border: '#BFDBFE',
           text: '#1D4ED8',
         },
-        leadContacted: {
-          DEFAULT: '#8B5CF6',
-          bg: '#F5F3FF',
-          border: '#DDD6FE',
-          text: '#6D28D9',
+        statusContacted: {
+          DEFAULT: '#4F46E5',
+          bg: '#EEF2FF',
+          border: '#C7D2FE',
+          text: '#3730A3',
         },
-        leadNegotiating: {
+        statusNegotiating: {
           DEFAULT: '#F59E0B',
           bg: '#FFFBEB',
           border: '#FDE68A',
           text: '#B45309',
         },
-        leadClosed: {
+        statusClosed: {
           DEFAULT: '#10B981',
           bg: '#ECFDF5',
           border: '#A7F3D0',
           text: '#047857',
         },
-        leadLost: {
-          DEFAULT: '#64748B',
-          bg: '#F8FAFC',
-          border: '#E2E8F0',
-          text: '#475569',
+        statusLost: {
+          DEFAULT: '#EF4444',
+          bg: '#FEF2F2',
+          border: '#FECACA',
+          text: '#B91C1C',
         },
       },
       borderRadius: {
-        lg: 'var(--radius)',
-        md: 'calc(var(--radius) - 2px)',
-        sm: 'calc(var(--radius) - 4px)',
+        lg: '0.75rem',
+        md: '0.5rem',
+        sm: '0.375rem',
       },
     },
   },

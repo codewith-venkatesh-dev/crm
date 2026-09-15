@@ -5,7 +5,7 @@ import {
   Users,
   Kanban,
   Plus,
-  Building2,
+  Handshake,
   Menu,
   X,
   ShieldCheck,
@@ -13,6 +13,7 @@ import {
   User as UserIcon,
 } from 'lucide-react';
 import { LeadFormModal } from '../leads/LeadFormModal';
+import { NetworkStatusBanner } from '../common/NetworkStatusBanner';
 import { useAuth } from '../../context/AuthContext';
 
 export const MainLayout: React.FC = () => {
@@ -48,18 +49,18 @@ export const MainLayout: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row">
+    <div className="min-h-screen bg-[#F5F6F8] text-[#1E293B] flex flex-col md:flex-row">
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-slate-200">
+      <div className="md:hidden flex items-center justify-between px-4 py-3 bg-white border-b border-[#E2E8F0]">
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
-            <Building2 className="w-5 h-5" />
+          <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center text-white font-bold text-lg shadow-sm">
+            <Handshake className="w-5 h-5" />
           </div>
-          <span className="font-bold text-slate-900 text-lg">Apex CRM</span>
+          <span className="font-bold text-[#1E293B] text-lg">Leadly</span>
         </div>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className="p-2 text-slate-600 rounded-lg hover:bg-slate-100"
+          className="p-2 text-[#64748B] rounded-lg hover:bg-[#F8FAFC]"
         >
           {isMobileMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
         </button>
@@ -67,18 +68,17 @@ export const MainLayout: React.FC = () => {
 
       {/* Sidebar Navigation */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-white flex flex-col transform transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-40 w-64 bg-[#1E293B] text-white flex flex-col transform transition-transform duration-200 ease-in-out md:static md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         {/* Brand Header */}
-        <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-800">
-          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white font-bold shadow-md">
-            <Building2 className="w-5 h-5" />
+        <div className="flex items-center gap-3 px-6 py-5 border-b border-slate-700/60">
+          <div className="w-9 h-9 rounded-xl bg-[#4F46E5] flex items-center justify-center text-white font-bold shadow-md">
+            <Handshake className="w-5 h-5" />
           </div>
           <div>
-            <h1 className="font-bold text-slate-100 text-base leading-tight">Apex CRM</h1>
-            <p className="text-xs text-slate-400">Internal Sales Platform</p>
+            <h1 className="font-bold text-slate-100 text-base leading-tight">Leadly CRM</h1>
+            <p className="text-xs text-slate-400">Centralized Lead Management System</p>
           </div>
         </div>
 
@@ -86,7 +86,7 @@ export const MainLayout: React.FC = () => {
         <div className="p-4">
           <button
             onClick={() => setIsAddLeadModalOpen(true)}
-            className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-4 py-2.5 rounded-lg shadow-sm transition-all duration-150 active:scale-[0.98]"
+            className="w-full flex items-center justify-center gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold px-4 py-2.5 rounded-lg shadow-sm transition-all duration-150 active:scale-[0.98]"
           >
             <Plus className="w-4 h-4" />
             <span>New Lead</span>
@@ -103,10 +103,9 @@ export const MainLayout: React.FC = () => {
                 to={item.to}
                 onClick={() => setIsMobileMenuOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                    isActive
-                      ? 'bg-indigo-600/20 text-indigo-400 border border-indigo-500/30'
-                      : 'text-slate-300 hover:bg-slate-800/80 hover:text-white'
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive
+                    ? 'bg-[#4F46E5]/20 text-[#818CF8] border border-[#4F46E5]/40 font-semibold'
+                    : 'text-slate-300 hover:bg-slate-800 hover:text-white'
                   }`
                 }
               >
@@ -118,11 +117,11 @@ export const MainLayout: React.FC = () => {
         </nav>
 
         {/* Logged in User Profile Footer */}
-        <div className="p-4 border-t border-slate-800 space-y-3">
+        <div className="p-4 border-t border-slate-700/60 space-y-3">
           {user && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs shrink-0">
+                <div className="w-8 h-8 rounded-full bg-[#4F46E5] text-white flex items-center justify-center font-bold text-xs shrink-0">
                   {user.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="min-w-0">
@@ -146,21 +145,24 @@ export const MainLayout: React.FC = () => {
       </aside>
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 overflow-x-hidden bg-[#F5F6F8]">
+        {/* Offline Network Banner */}
+        <NetworkStatusBanner />
+
         {/* Top Desktop Bar */}
-        <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-slate-200">
-          <h2 className="text-xl font-bold text-slate-900 tracking-tight">{getPageTitle()}</h2>
+        <header className="hidden md:flex items-center justify-between px-8 py-4 bg-white border-b border-[#E2E8F0]">
+          <h2 className="text-xl font-bold text-[#1E293B] tracking-tight">{getPageTitle()}</h2>
 
           <div className="flex items-center gap-3">
             {user && (
-              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1.5">
-                <UserIcon className="w-3.5 h-3.5 text-indigo-600" />
+              <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0] flex items-center gap-1.5">
+                <UserIcon className="w-3.5 h-3.5 text-[#4F46E5]" />
                 {user.name} ({user.userRight === 1 ? 'Super Admin' : 'Agent'})
               </span>
             )}
             <button
               onClick={() => setIsAddLeadModalOpen(true)}
-              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm transition-all"
+              className="flex items-center gap-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-sm font-medium px-4 py-2 rounded-lg shadow-sm transition-all"
             >
               <Plus className="w-4 h-4" />
               <span>Add Lead</span>

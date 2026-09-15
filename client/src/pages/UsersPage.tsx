@@ -150,11 +150,11 @@ export const UsersPage: React.FC = () => {
                 {users?.map((usr) => (
                   <tr key={usr.id} className="hover:bg-slate-50/60 transition-colors">
                     <td className="py-3.5 px-4 font-semibold text-slate-900 flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 font-bold text-xs">
+                      <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-slate-600 font-bold text-xs">
                         {usr.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <span>{usr.name}</span>
+                        <span>{usr.name.charAt(0).toUpperCase() + usr.name.slice(1).toLowerCase()}</span>
                         {usr.id === currentUser?.id && (
                           <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded">
                             You
@@ -169,12 +169,12 @@ export const UsersPage: React.FC = () => {
                       {usr.userRight === 1 ? (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200">
                           <Shield className="w-3 h-3 mr-1 text-indigo-600" />
-                          Super Admin (userRight = 1)
+                          Super Admin
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
                           <UserIcon className="w-3 h-3 mr-1 text-slate-500" />
-                          Normal User (userRight = 0)
+                          Normal User
                         </span>
                       )}
                     </td>
@@ -219,11 +219,10 @@ export const UsersPage: React.FC = () => {
                 type="text"
                 placeholder="e.g. Maria Garcia"
                 {...register('name')}
-                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
-                  errors.name
-                    ? 'border-rose-300 focus:ring-rose-500'
-                    : 'border-slate-300 focus:ring-indigo-500'
-                }`}
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${errors.name
+                  ? 'border-rose-300 focus:ring-rose-500'
+                  : 'border-slate-300 focus:ring-indigo-500'
+                  }`}
               />
               {errors.name && (
                 <p className="text-xs text-rose-600 mt-1">{errors.name.message}</p>
@@ -238,11 +237,10 @@ export const UsersPage: React.FC = () => {
                 type="email"
                 placeholder="e.g. maria@crm.com"
                 {...register('email')}
-                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
-                  errors.email
-                    ? 'border-rose-300 focus:ring-rose-500'
-                    : 'border-slate-300 focus:ring-indigo-500'
-                }`}
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${errors.email
+                  ? 'border-rose-300 focus:ring-rose-500'
+                  : 'border-slate-300 focus:ring-indigo-500'
+                  }`}
               />
               {errors.email && (
                 <p className="text-xs text-rose-600 mt-1">{errors.email.message}</p>
@@ -257,11 +255,10 @@ export const UsersPage: React.FC = () => {
                 type="password"
                 placeholder="••••••••"
                 {...register('password')}
-                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${
-                  errors.password
-                    ? 'border-rose-300 focus:ring-rose-500'
-                    : 'border-slate-300 focus:ring-indigo-500'
-                }`}
+                className={`w-full px-3 py-2 text-sm border rounded-lg focus:outline-none focus:ring-2 ${errors.password
+                  ? 'border-rose-300 focus:ring-rose-500'
+                  : 'border-slate-300 focus:ring-indigo-500'
+                  }`}
               />
               {errors.password && (
                 <p className="text-xs text-rose-600 mt-1">{errors.password.message}</p>

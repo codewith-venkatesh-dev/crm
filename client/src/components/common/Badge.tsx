@@ -30,9 +30,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
     },
     CONTACTED: {
       label: 'Contacted',
-      bg: 'bg-purple-50',
-      text: 'text-purple-700',
-      border: 'border-purple-200',
+      bg: 'bg-indigo-50',
+      text: 'text-indigo-700',
+      border: 'border-indigo-200',
     },
     NEGOTIATING: {
       label: 'Negotiating',
@@ -48,9 +48,9 @@ export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'md' })
     },
     LOST: {
       label: 'Lost',
-      bg: 'bg-slate-100',
-      text: 'text-slate-600',
-      border: 'border-slate-200',
+      bg: 'bg-rose-50',
+      text: 'text-rose-700',
+      border: 'border-rose-200',
     },
   };
 
@@ -79,19 +79,19 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
   const getSourceIcon = (src: LeadSource) => {
     switch (src) {
       case 'WEBSITE':
-        return <Globe className="w-3 h-3 mr-1 text-sky-500" />;
+        return <Globe className="w-3 h-3 mr-1 text-slate-500" />;
       case 'REFERRAL':
-        return <Users className="w-3 h-3 mr-1 text-teal-500" />;
+        return <Users className="w-3 h-3 mr-1 text-slate-500" />;
       case 'LINKEDIN':
-        return <Linkedin className="w-3 h-3 mr-1 text-blue-600" />;
+        return <Linkedin className="w-3 h-3 mr-1 text-slate-500" />;
       case 'COLD_EMAIL':
-        return <Mail className="w-3 h-3 mr-1 text-indigo-500" />;
+        return <Mail className="w-3 h-3 mr-1 text-slate-500" />;
       case 'WHATSAPP':
-        return <MessageSquare className="w-3 h-3 mr-1 text-emerald-500" />;
+        return <MessageSquare className="w-3 h-3 mr-1 text-slate-500" />;
       case 'PHONE_CALL':
-        return <Phone className="w-3 h-3 mr-1 text-purple-500" />;
+        return <Phone className="w-3 h-3 mr-1 text-slate-500" />;
       case 'ADVERTISEMENT':
-        return <Megaphone className="w-3 h-3 mr-1 text-orange-500" />;
+        return <Megaphone className="w-3 h-3 mr-1 text-slate-500" />;
       default:
         return <HelpCircle className="w-3 h-3 mr-1 text-slate-400" />;
     }
@@ -105,7 +105,7 @@ export const SourceBadge: React.FC<SourceBadgeProps> = ({ source }) => {
   };
 
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0]">
       {getSourceIcon(source)}
       {formatSource(source)}
     </span>
@@ -154,7 +154,7 @@ export const FollowUpStatusBadge: React.FC<FollowUpStateBadgeProps> = ({
   }
 
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-sky-50 text-sky-700 border border-sky-200">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
       <Calendar className="w-3 h-3 mr-1" />
       Upcoming
     </span>
@@ -167,7 +167,7 @@ interface FollowUpTypeBadgeProps {
 
 export const FollowUpTypeBadge: React.FC<FollowUpTypeBadgeProps> = ({ type }) => {
   return (
-    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200">
+    <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0]">
       {type}
     </span>
   );
