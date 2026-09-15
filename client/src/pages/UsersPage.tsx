@@ -42,6 +42,8 @@ export const UsersPage: React.FC = () => {
   const { data: users, isLoading, isError, error } = useQuery({
     queryKey: ['users'],
     queryFn: () => api.getUsers(),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const {
@@ -62,6 +64,10 @@ export const UsersPage: React.FC = () => {
   const createUserMutation = useMutation({
     mutationFn: (data: UserFormData) => api.createUser(data),
     onSuccess: (newUser) => {
+      queryClient.setQueryData(['users'], (old: any) => {
+        if (!old || !Array.isArray(old)) return [newUser];
+        return [...old, newUser];
+      });
       queryClient.invalidateQueries({ queryKey: ['users'] });
       toast(`User "${newUser.name}" created successfully`);
       setIsAddUserModalOpen(false);
@@ -74,13 +80,29 @@ export const UsersPage: React.FC = () => {
 
   const deleteUserMutation = useMutation({
     mutationFn: (id: string) => api.deleteUser(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['users'] });
+      const previousUsers = queryClient.getQueryData(['users']);
+
+      queryClient.setQueryData(['users'], (old: any) => {
+        if (!old || !Array.isArray(old)) return old;
+        return old.filter((u: any) => u.id !== id);
+      });
+
+      return { previousUsers };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousUsers) {
+        queryClient.setQueryData(['users'], context.previousUsers);
+      }
+      toast(err.message || 'Failed to delete user', 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['users'] });
       toast('User deleted successfully');
       setDeletingUser(null);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to delete user', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     },
   });
 

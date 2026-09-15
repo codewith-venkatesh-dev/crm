@@ -80,11 +80,35 @@ export const LeadFormModal: React.FC<LeadFormModalProps> = ({
       return api.createLead(data as Partial<Lead>);
     },
     onSuccess: (updatedLead) => {
+      queryClient.setQueryData(['lead', updatedLead.id], (old: any) => {
+        if (!old) return updatedLead;
+        return {
+          ...old,
+          ...updatedLead,
+        };
+      });
+
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        const exists = oldData.data.some((l: any) => l.id === updatedLead.id);
+        if (exists) {
+          return {
+            ...oldData,
+            data: oldData.data.map((l: any) =>
+              l.id === updatedLead.id ? { ...l, ...updatedLead } : l
+            ),
+          };
+        }
+        return {
+          ...oldData,
+          data: [updatedLead, ...oldData.data],
+        };
+      });
+
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead', updatedLead.id] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
-      if (isEditing && lead) {
-        queryClient.invalidateQueries({ queryKey: ['lead', lead.id] });
-      }
+
       toast(
         isEditing
           ? `Lead "${updatedLead.name}" updated successfully`

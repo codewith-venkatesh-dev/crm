@@ -15,18 +15,50 @@ export const PipelinePage: React.FC = () => {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['leads', { limit: 100 }],
     queryFn: () => api.getLeads({ limit: 100 }),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ leadId, status }: { leadId: string; status: LeadStatus }) =>
       api.updateLeadStatus(leadId, status),
+    onMutate: async ({ leadId, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+      const previousLeadsData = queryClient.getQueryData(['leads', { limit: 100 }]);
+
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((lead: any) =>
+            lead.id === leadId ? { ...lead, status } : lead
+          ),
+        };
+      });
+
+      return { previousLeadsData };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLeadsData) {
+        queryClient.setQueriesData({ queryKey: ['leads'] }, context.previousLeadsData);
+      }
+      toast(err.message || 'Failed to move lead stage', 'error');
+    },
     onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((lead: any) =>
+            lead.id === updated.id ? updated : lead
+          ),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast(`Lead moved to ${updated.status}`);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to move lead stage', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });
 
@@ -75,7 +107,11 @@ export const PipelinePage: React.FC = () => {
       </div>
 
       {/* Kanban Board View */}
-      <KanbanBoard leads={data.data} onStatusChange={handleStatusChange} />
+      <KanbanBoard
+        leads={data.data}
+        onStatusChange={handleStatusChange}
+        updatingLeadId={statusMutation.isPending ? statusMutation.variables?.leadId : null}
+      />
 
       {/* Modal */}
       {isAddLeadModalOpen && (

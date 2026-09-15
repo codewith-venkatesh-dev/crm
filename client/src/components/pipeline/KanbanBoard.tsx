@@ -3,12 +3,13 @@ import { Link } from 'react-router-dom';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { Lead, LeadStatus } from '../../types/crm';
 import { SourceBadge } from '../common/Badge';
-import { Calendar, Building, ChevronRight, Clock } from 'lucide-react';
+import { Calendar, Building, ChevronRight, Clock, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface KanbanBoardProps {
   leads: Lead[];
   onStatusChange: (leadId: string, newStatus: LeadStatus) => void;
+  updatingLeadId?: string | null;
 }
 
 const STAGES: { id: LeadStatus; label: string; color: string; dotColor: string }[] = [
@@ -33,7 +34,7 @@ const STAGES: { id: LeadStatus; label: string; color: string; dotColor: string }
   },
 ];
 
-export const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads, onStatusChange }) => {
+export const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads, onStatusChange, updatingLeadId }) => {
   const handleDragEnd = (result: DropResult) => {
     const { destination, draggableId } = result;
     if (!destination) return;
@@ -81,6 +82,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads, onStatusChange 
                     ) : (
                       stageLeads.map((lead, index) => {
                         const nextFollowUp = lead.followUps?.find((f) => !f.isCompleted);
+                        const isUpdating = updatingLeadId === lead.id;
 
                         return (
                           <Draggable key={lead.id} draggableId={lead.id} index={index}>
@@ -89,10 +91,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads, onStatusChange 
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`bg-white rounded-lg p-4 border border-slate-200 shadow-sm hover:shadow-md transition-all group ${
+                                className={`relative bg-white rounded-lg p-4 border border-slate-200 shadow-sm hover:shadow-md transition-all group ${
                                   snapshot.isDragging ? 'rotate-1 shadow-lg ring-2 ring-indigo-500' : ''
-                                }`}
+                                } ${isUpdating ? 'pointer-events-none opacity-90' : ''}`}
                               >
+                                {isUpdating && (
+                                  <div className="absolute inset-0 bg-white/85 backdrop-blur-[1px] rounded-lg flex flex-col items-center justify-center gap-1.5 z-20 text-indigo-600 font-medium text-xs animate-fade-in">
+                                    <Loader2 className="w-5 h-5 animate-spin text-indigo-600" />
+                                    <span className="font-semibold text-slate-700">Updating stage...</span>
+                                  </div>
+                                )}
+
                                 <div className="flex items-start justify-between mb-2">
                                   <Link
                                     to={`/leads/${lead.id}`}
@@ -104,11 +113,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({ leads, onStatusChange 
                                   {/* Accessible Status Move Dropdown */}
                                   <select
                                     value={lead.status}
+                                    disabled={isUpdating}
                                     onChange={(e) =>
                                       onStatusChange(lead.id, e.target.value as LeadStatus)
                                     }
                                     onClick={(e) => e.stopPropagation()}
-                                    className="text-xs bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 ml-2"
+                                    className="text-xs bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5 text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 ml-2 disabled:opacity-50"
                                   >
                                     <option value="NEW">New</option>
                                     <option value="CONTACTED">Contacted</option>

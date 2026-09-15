@@ -49,10 +49,29 @@ export const LeadDetailPage: React.FC = () => {
     queryKey: ['lead', id],
     queryFn: () => api.getLeadById(id!),
     enabled: Boolean(id),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const deleteLeadMutation = useMutation({
     mutationFn: () => api.deleteLead(id!),
+    onMutate: async () => {
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.filter((l: any) => l.id !== id),
+          pagination: {
+            ...oldData.pagination,
+            total: Math.max(0, (oldData.pagination?.total || 1) - 1),
+          },
+        };
+      });
+
+      queryClient.removeQueries({ queryKey: ['lead', id] });
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
@@ -66,43 +85,127 @@ export const LeadDetailPage: React.FC = () => {
 
   const statusMutation = useMutation({
     mutationFn: (newStatus: LeadStatus) => api.updateLeadStatus(id!, newStatus),
+    onMutate: async (newStatus) => {
+      await queryClient.cancelQueries({ queryKey: ['lead', id] });
+      const previousLead = queryClient.getQueryData(['lead', id]);
+
+      queryClient.setQueryData(['lead', id], (old: any) => {
+        if (!old) return old;
+        return { ...old, status: newStatus };
+      });
+
+      return { previousLead };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLead) {
+        queryClient.setQueryData(['lead', id], context.previousLead);
+      }
+      toast(err.message || 'Failed to update status', 'error');
+    },
     onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['lead', id] });
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.setQueryData(['lead', id], updated);
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((l: any) =>
+            l.id === updated.id ? { ...l, status: updated.status } : l
+          ),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast(`Status updated to ${updated.status}`);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to update status', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead', id] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });
 
   const toggleFollowUpMutation = useMutation({
     mutationFn: ({ followUpId, completionNote }: { followUpId: string; completionNote?: string }) =>
       api.toggleFollowUpCompletion(followUpId, completionNote),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead', id] });
+    onMutate: async ({ followUpId, completionNote }) => {
+      await queryClient.cancelQueries({ queryKey: ['lead', id] });
+      const previousLead = queryClient.getQueryData(['lead', id]);
+
+      queryClient.setQueryData(['lead', id], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          followUps: old.followUps?.map((f: any) =>
+            f.id === followUpId
+              ? {
+                  ...f,
+                  isCompleted: !f.isCompleted,
+                  completionNote: completionNote !== undefined ? completionNote : f.completionNote,
+                  completedAt: new Date().toISOString(),
+                }
+              : f
+          ),
+        };
+      });
+
+      return { previousLead };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLead) {
+        queryClient.setQueryData(['lead', id], context.previousLead);
+      }
+      toast(err.message || 'Failed to toggle follow-up', 'error');
+    },
+    onSuccess: (updatedFollowUp) => {
+      queryClient.setQueryData(['lead', id], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          followUps: old.followUps?.map((f: any) =>
+            f.id === updatedFollowUp.id ? updatedFollowUp : f
+          ),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast('Follow-up status updated');
       setCompletingFollowUp(null);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to toggle follow-up', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead', id] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
   const deleteFollowUpMutation = useMutation({
     mutationFn: (followUpId: string) => api.deleteFollowUp(followUpId),
+    onMutate: async (followUpId) => {
+      await queryClient.cancelQueries({ queryKey: ['lead', id] });
+      const previousLead = queryClient.getQueryData(['lead', id]);
+
+      queryClient.setQueryData(['lead', id], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          followUps: old.followUps?.filter((f: any) => f.id !== followUpId),
+        };
+      });
+
+      return { previousLead };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLead) {
+        queryClient.setQueryData(['lead', id], context.previousLead);
+      }
+      toast(err.message || 'Failed to delete follow-up', 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['lead', id] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast('Follow-up deleted');
       setDeletingFollowUpId(null);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to delete follow-up', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['lead', id] });
     },
   });
 
@@ -149,6 +252,12 @@ export const LeadDetailPage: React.FC = () => {
           <div className="flex items-center gap-3">
             <h2 className="text-2xl font-bold text-slate-900 tracking-tight">{lead.name}</h2>
             <StatusBadge status={lead.status} size="lg" />
+            {statusMutation.isPending && (
+              <div className="flex items-center gap-1.5 text-xs text-indigo-600 font-semibold bg-indigo-50 px-2.5 py-1 rounded-md border border-indigo-200">
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                <span>Updating stage...</span>
+              </div>
+            )}
           </div>
         </div>
 
@@ -252,17 +361,23 @@ export const LeadDetailPage: React.FC = () => {
 
               <div>
                 <span className="text-xs text-slate-400 block font-medium">Stage Quick Selector</span>
-                <select
-                  value={lead.status}
-                  onChange={(e) => statusMutation.mutate(e.target.value as LeadStatus)}
-                  className="mt-1 w-full px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="NEW">New</option>
-                  <option value="CONTACTED">Contacted</option>
-                  <option value="NEGOTIATING">Negotiating</option>
-                  <option value="CLOSED">Closed</option>
-                  <option value="LOST">Lost</option>
-                </select>
+                <div className="relative mt-1">
+                  <select
+                    value={lead.status}
+                    disabled={statusMutation.isPending}
+                    onChange={(e) => statusMutation.mutate(e.target.value as LeadStatus)}
+                    className="w-full px-3 py-1.5 text-xs font-semibold border border-slate-300 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed pr-8"
+                  >
+                    <option value="NEW">New</option>
+                    <option value="CONTACTED">Contacted</option>
+                    <option value="NEGOTIATING">Negotiating</option>
+                    <option value="CLOSED">Closed</option>
+                    <option value="LOST">Lost</option>
+                  </select>
+                  {statusMutation.isPending && (
+                    <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin absolute right-2.5 top-2.5 pointer-events-none" />
+                  )}
+                </div>
               </div>
 
               <div className="pt-2 border-t border-slate-100 flex justify-between text-xs text-slate-500">
@@ -364,14 +479,26 @@ export const LeadDetailPage: React.FC = () => {
                         </div>
 
                         {/* Prominent Mark Complete Button */}
-                        <button
-                          onClick={() => setCompletingFollowUp(item)}
-                          className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-95"
-                          title="Mark Completed & Record Outcome Note"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Mark Completed</span>
-                        </button>
+                        {(() => {
+                          const isCompleting =
+                            toggleFollowUpMutation.isPending &&
+                            toggleFollowUpMutation.variables?.followUpId === item.id;
+                          return (
+                            <button
+                              onClick={() => setCompletingFollowUp(item)}
+                              disabled={isCompleting}
+                              className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg flex items-center gap-1 transition-all shadow-sm active:scale-95 disabled:opacity-50"
+                              title="Mark Completed & Record Outcome Note"
+                            >
+                              {isCompleting ? (
+                                <Loader2 className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              )}
+                              <span>{isCompleting ? 'Saving...' : 'Mark Completed'}</span>
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -389,15 +516,27 @@ export const LeadDetailPage: React.FC = () => {
                         >
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <button
-                                onClick={() =>
-                                  toggleFollowUpMutation.mutate({ followUpId: item.id })
-                                }
-                                className="text-emerald-600"
-                                title="Re-open task"
-                              >
-                                <CheckCircle2 className="w-4 h-4 fill-emerald-100" />
-                              </button>
+                              {(() => {
+                                const isToggling =
+                                  toggleFollowUpMutation.isPending &&
+                                  toggleFollowUpMutation.variables?.followUpId === item.id;
+                                return (
+                                  <button
+                                    onClick={() =>
+                                      toggleFollowUpMutation.mutate({ followUpId: item.id })
+                                    }
+                                    disabled={isToggling}
+                                    className="text-emerald-600 disabled:opacity-50"
+                                    title="Re-open task"
+                                  >
+                                    {isToggling ? (
+                                      <Loader2 className="w-4 h-4 text-emerald-600 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="w-4 h-4 fill-emerald-100" />
+                                    )}
+                                  </button>
+                                );
+                              })()}
                               <span className="font-semibold text-slate-800">{item.title}</span>
                             </div>
                             <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">

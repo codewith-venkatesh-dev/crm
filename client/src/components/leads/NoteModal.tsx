@@ -40,7 +40,15 @@ export const NoteModal: React.FC<NoteModalProps> = ({ isOpen, onClose, leadId })
 
   const mutation = useMutation({
     mutationFn: (data: NoteFormData) => api.createActivity(leadId, data),
-    onSuccess: () => {
+    onSuccess: (newActivity) => {
+      queryClient.setQueryData(['lead', leadId], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          activities: [newActivity, ...(old.activities || [])],
+        };
+      });
+
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast('Note recorded in activity timeline');

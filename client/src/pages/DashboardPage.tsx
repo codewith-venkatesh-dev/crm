@@ -30,19 +30,46 @@ export const DashboardPage: React.FC = () => {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['dashboard'],
     queryFn: () => api.getDashboardSummary(),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const toggleFollowUpMutation = useMutation({
     mutationFn: ({ followUpId, completionNote }: { followUpId: string; completionNote?: string }) =>
       api.toggleFollowUpCompletion(followUpId, completionNote),
+    onMutate: async ({ followUpId }) => {
+      await queryClient.cancelQueries({ queryKey: ['dashboard'] });
+      const previousDashboard = queryClient.getQueryData(['dashboard']);
+
+      queryClient.setQueryData(['dashboard'], (old: any) => {
+        if (!old) return old;
+        return {
+          ...old,
+          upcomingFollowUps: old.upcomingFollowUps?.filter((f: any) => f.id !== followUpId),
+          summary: {
+            ...old.summary,
+            dueTodayFollowUps: Math.max(0, (old.summary?.dueTodayFollowUps || 1) - 1),
+          },
+        };
+      });
+
+      return { previousDashboard };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousDashboard) {
+        queryClient.setQueryData(['dashboard'], context.previousDashboard);
+      }
+      toast(err.message || 'Failed to complete follow-up', 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       toast('Follow-up marked as completed');
       setCompletingFollowUp(null);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to complete follow-up', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead'] });
     },
   });
 
@@ -249,14 +276,26 @@ export const DashboardPage: React.FC = () => {
                         </span>
 
                         {/* Direct Mark Completed Button */}
-                        <button
-                          onClick={() => setCompletingFollowUp(item)}
-                          className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg flex items-center gap-1 transition-all shadow-xs active:scale-95"
-                          title="Mark Completed & Record Outcome Note"
-                        >
-                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                          <span>Complete</span>
-                        </button>
+                        {(() => {
+                          const isCompleting =
+                            toggleFollowUpMutation.isPending &&
+                            toggleFollowUpMutation.variables?.followUpId === item.id;
+                          return (
+                            <button
+                              onClick={() => setCompletingFollowUp(item)}
+                              disabled={isCompleting}
+                              className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 rounded-lg flex items-center gap-1 transition-all shadow-xs active:scale-95 disabled:opacity-50"
+                              title="Mark Completed & Record Outcome Note"
+                            >
+                              {isCompleting ? (
+                                <Loader2 className="w-3.5 h-3.5 text-emerald-600 animate-spin" />
+                              ) : (
+                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                              )}
+                              <span>{isCompleting ? 'Saving...' : 'Complete'}</span>
+                            </button>
+                          );
+                        })()}
                       </div>
                     </div>
                   );

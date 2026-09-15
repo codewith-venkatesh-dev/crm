@@ -72,45 +72,134 @@ export const LeadsPage: React.FC = () => {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ['leads', filterParams],
     queryFn: () => api.getLeads(filterParams),
+    refetchOnMount: 'always',
+    staleTime: 0,
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.deleteLead(id),
+    onMutate: async (id) => {
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+      const previousLeadsData = queryClient.getQueryData(['leads', filterParams]);
+
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.filter((lead: any) => lead.id !== id),
+          pagination: {
+            ...oldData.pagination,
+            total: Math.max(0, (oldData.pagination?.total || 1) - 1),
+          },
+        };
+      });
+
+      queryClient.removeQueries({ queryKey: ['lead', id] });
+      return { previousLeadsData };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLeadsData) {
+        queryClient.setQueriesData({ queryKey: ['leads'] }, context.previousLeadsData);
+      }
+      toast(err.message || 'Failed to delete lead', 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast('Lead deleted successfully');
       setDeletingLead(null);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to delete lead', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });
 
   const statusMutation = useMutation({
     mutationFn: ({ id, status }: { id: string; status: LeadStatus }) =>
       api.updateLeadStatus(id, status),
+    onMutate: async ({ id, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+      const previousLeadsData = queryClient.getQueryData(['leads', filterParams]);
+
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((lead: any) =>
+            lead.id === id ? { ...lead, status } : lead
+          ),
+        };
+      });
+
+      return { previousLeadsData };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLeadsData) {
+        queryClient.setQueriesData({ queryKey: ['leads'] }, context.previousLeadsData);
+      }
+      toast(err.message || 'Failed to update status', 'error');
+    },
     onSuccess: (updated) => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((lead: any) =>
+            lead.id === updated.id ? updated : lead
+          ),
+        };
+      });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast(`Status updated to ${updated.status}`);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to update status', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
     },
   });
 
   const toggleFollowUpMutation = useMutation({
     mutationFn: ({ followUpId, completionNote }: { followUpId: string; completionNote?: string }) =>
       api.toggleFollowUpCompletion(followUpId, completionNote),
+    onMutate: async ({ followUpId, completionNote }) => {
+      await queryClient.cancelQueries({ queryKey: ['leads'] });
+      const previousLeadsData = queryClient.getQueryData(['leads', filterParams]);
+
+      queryClient.setQueriesData({ queryKey: ['leads'] }, (oldData: any) => {
+        if (!oldData || !Array.isArray(oldData.data)) return oldData;
+        return {
+          ...oldData,
+          data: oldData.data.map((l: any) => ({
+            ...l,
+            followUps: l.followUps?.map((f: any) =>
+              f.id === followUpId
+                ? {
+                    ...f,
+                    isCompleted: true,
+                    completionNote: completionNote || f.completionNote,
+                    completedAt: new Date().toISOString(),
+                  }
+                : f
+            ),
+          })),
+        };
+      });
+
+      return { previousLeadsData };
+    },
+    onError: (err: Error, _vars, context) => {
+      if (context?.previousLeadsData) {
+        queryClient.setQueriesData({ queryKey: ['leads'] }, context.previousLeadsData);
+      }
+      toast(err.message || 'Failed to complete follow-up', 'error');
+    },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       toast('Follow-up marked as completed');
       setCompletingFollowUp(null);
     },
-    onError: (err: Error) => {
-      toast(err.message || 'Failed to complete follow-up', 'error');
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['lead'] });
+      queryClient.invalidateQueries({ queryKey: ['dashboard'] });
     },
   });
 
@@ -345,22 +434,34 @@ export const LeadsPage: React.FC = () => {
 
                       {/* Status dropdown */}
                       <td className="py-3.5 px-4">
-                        <select
-                          value={lead.status}
-                          onChange={(e) =>
-                            statusMutation.mutate({
-                              id: lead.id,
-                              status: e.target.value as LeadStatus,
-                            })
-                          }
-                          className="text-xs border border-slate-200 rounded px-2 py-1 bg-white font-medium focus:ring-1 focus:ring-indigo-500"
-                        >
-                          <option value="NEW">New</option>
-                          <option value="CONTACTED">Contacted</option>
-                          <option value="NEGOTIATING">Negotiating</option>
-                          <option value="CLOSED">Closed</option>
-                          <option value="LOST">Lost</option>
-                        </select>
+                        {(() => {
+                          const isUpdating =
+                            statusMutation.isPending && statusMutation.variables?.id === lead.id;
+                          return (
+                            <div className="flex items-center gap-1.5">
+                              <select
+                                value={lead.status}
+                                disabled={isUpdating}
+                                onChange={(e) =>
+                                  statusMutation.mutate({
+                                    id: lead.id,
+                                    status: e.target.value as LeadStatus,
+                                  })
+                                }
+                                className="text-xs border border-slate-200 rounded px-2 py-1 bg-white font-medium focus:ring-1 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <option value="NEW">New</option>
+                                <option value="CONTACTED">Contacted</option>
+                                <option value="NEGOTIATING">Negotiating</option>
+                                <option value="CLOSED">Closed</option>
+                                <option value="LOST">Lost</option>
+                              </select>
+                              {isUpdating && (
+                                <Loader2 className="w-3.5 h-3.5 text-indigo-600 animate-spin shrink-0" />
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       {/* Next Follow Up with Quick Complete Action */}
@@ -376,14 +477,26 @@ export const LeadsPage: React.FC = () => {
                                 {nextFollowUp.title} ({format(new Date(nextFollowUp.dueDate), 'MMM d')})
                               </span>
                             </div>
-                            <button
-                              onClick={() => setCompletingFollowUp(nextFollowUp)}
-                              className="px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded flex items-center gap-1 transition-all shrink-0"
-                              title="Mark Follow-up Completed & Record Outcome Note"
-                            >
-                              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                              <span>Complete</span>
-                            </button>
+                            {(() => {
+                              const isCompleting =
+                                toggleFollowUpMutation.isPending &&
+                                toggleFollowUpMutation.variables?.followUpId === nextFollowUp.id;
+                              return (
+                                <button
+                                  onClick={() => setCompletingFollowUp(nextFollowUp)}
+                                  disabled={isCompleting}
+                                  className="px-2 py-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded flex items-center gap-1 transition-all shrink-0 disabled:opacity-50"
+                                  title="Mark Follow-up Completed & Record Outcome Note"
+                                >
+                                  {isCompleting ? (
+                                    <Loader2 className="w-3 h-3 text-emerald-600 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                                  )}
+                                  <span>{isCompleting ? 'Saving...' : 'Complete'}</span>
+                                </button>
+                              );
+                            })()}
                           </div>
                         ) : (
                           <span className="text-xs text-slate-400 italic">None scheduled</span>

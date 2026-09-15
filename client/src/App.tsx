@@ -15,7 +15,9 @@ import { Loader2 } from 'lucide-react';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
+      refetchOnMount: 'always',
+      refetchOnWindowFocus: true,
+      staleTime: 0,
       retry: 1,
     },
   },

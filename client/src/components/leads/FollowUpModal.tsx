@@ -69,7 +69,20 @@ export const FollowUpModal: React.FC<FollowUpModalProps> = ({
       }
       return api.createFollowUp(leadId, data);
     },
-    onSuccess: () => {
+    onSuccess: (resFollowUp) => {
+      queryClient.setQueryData(['lead', leadId], (old: any) => {
+        if (!old) return old;
+        const existing = old.followUps || [];
+        const exists = existing.some((f: any) => f.id === resFollowUp.id);
+        const updatedFollowUps = exists
+          ? existing.map((f: any) => (f.id === resFollowUp.id ? resFollowUp : f))
+          : [...existing, resFollowUp];
+        return {
+          ...old,
+          followUps: updatedFollowUps,
+        };
+      });
+
       queryClient.invalidateQueries({ queryKey: ['lead', leadId] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['dashboard'] });
