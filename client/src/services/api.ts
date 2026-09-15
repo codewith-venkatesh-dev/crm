@@ -8,7 +8,7 @@ import {
   User,
 } from '../types/crm';
 
-const API_BASE_URL = import.meta.env.BACKEND_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_BACKEND_URL || '/api';
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('crm_jwt_token');
